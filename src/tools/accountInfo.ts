@@ -75,12 +75,12 @@ export const getAccountPositions = async (
       positionsText += `## ${index + 1}. ${token.name} (${token.symbol})\n`
       positionsText += `- Token Address: ${token.token_address}\n`
       positionsText += `- Current Amount: ${position.current_token_amount}\n`
-      positionsText += `- Total Bought (Native): ${position.total_bought_native}\n`
+      positionsText += `- Total Bought (MON): ${position.total_bought_native}\n`
       positionsText += `- Total Bought (Token): ${position.total_bought_token}\n`
-      positionsText += `- Realized PnL: ${position.realized_pnl}\n`
-      positionsText += `- Unrealized PnL: ${position.unrealized_pnl}\n`
-      positionsText += `- Total PnL: ${position.total_pnl}\n`
-      positionsText += `- Current Price: ${market.price}\n`
+      positionsText += `- Realized PnL (MON): ${position.realized_pnl}\n`
+      positionsText += `- Unrealized PnL (MON): ${position.unrealized_pnl}\n`
+      positionsText += `- Total PnL (MON): ${position.total_pnl}\n`
+      positionsText += `- Current Price: ${market.price} MON\n`
       positionsText += `- Market Type: ${market.market_type}\n`
       positionsText += `- Last Traded: ${new Date(
         position.last_traded_at * 1000,
@@ -149,11 +149,11 @@ export const getAccountCreatedTokens = async (
       tokensText += `- Total Supply: ${token.total_supply}\n`
 
       if (token.price) {
-        tokensText += `- Current Price: ${token.price}\n`
+        tokensText += `- Current Price: ${token.price} MON\n`
       }
 
       if (token.market_cap) {
-        tokensText += `- Market Cap: ${token.market_cap}\n`
+        tokensText += `- Market Cap: ${token.market_cap} MON\n`
       }
 
       if (token.current_amount) {
