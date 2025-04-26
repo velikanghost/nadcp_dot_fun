@@ -8,39 +8,25 @@ import {
 import { privateKeyToAccount } from 'viem/accounts'
 import { parseEther } from 'viem/utils'
 import { monadTestnet } from 'viem/chains'
+import * as dotenv from 'dotenv'
 // Import official contract ABIs
 import * as NadFunAbi from 'contract-abi'
 
-// Contract addresses for Nad.fun
-// export const CONTRACT_ADDRESSES = {
-//   CORE: '0x822EB1ADD41cf87C3F178100596cf24c9a6442f6', // Replace with actual address
-//   WRAPPED_MON: '0x1234567890abcdef1234567890abcdef12345678', // Replace with actual address
-//   UNISWAP_V2_ROUTER: '0x1234567890abcdef1234567890abcdef12345678', // Replace with actual address
-//   UNISWAP_V2_FACTORY: '0x1234567890abcdef1234567890abcdef12345678', // Replace with actual address
-// }
+// Load environment variables
+dotenv.config()
 
 export const CONTRACT_ADDRESSES = {
-  CORE:
-    process.env.CORE_CONTRACT_ADDRESS ||
-    '0x822EB1ADD41cf87C3F178100596cf24c9a6442f6',
-  BONDING_CURVE_FACTORY:
-    process.env.BONDING_CURVE_FACTORY_ADDRESS ||
-    '0x60216FB3285595F4643f9f7cddAB842E799BD642',
-  UNISWAP_V2_ROUTER:
-    process.env.INTERNAL_UNISWAP_V2_ROUTER_ADDRESS ||
-    '0x619d07287e87C9c643C60882cA80d23C8ed44652',
-  UNISWAP_V2_FACTORY:
-    process.env.INTERNAL_UNISWAP_V2_FACTORY_ADDRESS ||
-    '0x13eD0D5e1567684D964469cCbA8A977CDA580827',
-  WRAPPED_MON:
-    process.env.WRAPPED_MON_ADDRESS ||
-    '0x3bb9AFB94c82752E47706A10779EA525Cf95dc27',
+  CORE: '0x822EB1ADD41cf87C3F178100596cf24c9a6442f6',
+  BONDING_CURVE_FACTORY: '0x60216FB3285595F4643f9f7cddAB842E799BD642',
+  UNISWAP_V2_ROUTER: '0x619d07287e87C9c643C60882cA80d23C8ed44652',
+  UNISWAP_V2_FACTORY: '0x13eD0D5e1567684D964469cCbA8A977CDA580827',
+  WRAPPED_MON: '0x3bb9AFB94c82752E47706A10779EA525Cf95dc27',
 }
 
 // Blockchain configuration
 export const BLOCKCHAIN_CONFIG = {
   chain: monadTestnet,
-  rpcUrl: 'https://rpc.testnet.monad.xyz/json-rpc',
+  rpcUrl: `https://monad-testnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
 }
 
 /**
@@ -69,6 +55,36 @@ export function createPublicRpcClient(): PublicClient {
     chain: BLOCKCHAIN_CONFIG.chain,
     transport: http(BLOCKCHAIN_CONFIG.rpcUrl),
   })
+}
+
+/**
+ * Transfer tokens from one account to another
+ * @param privateKey - Private key of the sender
+ * @param tokenAddress - Token address to transfer
+ * @param amount - Amount of tokens to transfer
+ * @returns Transaction hash
+ */
+export async function transfer(
+  privateKey: string,
+  accountAddress: string,
+  amount: string,
+): Promise<string> {
+  const walletClient = createWalletClientFromPrivateKey(privateKey)
+  const publicClient = createPublicRpcClient()
+  //check balance
+  const balance = await publicClient.getBalance({
+    address: walletClient.account?.address as `0x${string}`,
+  })
+  if (balance < parseEther(amount)) {
+    throw new Error('Insufficient balance')
+  }
+  const tx = await walletClient.sendTransaction({
+    account: walletClient.account!,
+    to: accountAddress as `0x${string}`,
+    value: parseEther(amount),
+    chain: walletClient.chain,
+  })
+  return tx
 }
 
 /**
@@ -102,6 +118,7 @@ export async function buyFromCore(
   amount: string,
 ): Promise<string> {
   const walletClient = createWalletClientFromPrivateKey(privateKey)
+  const coreAbi = NadFunAbi.ICore
 
   const amountIn = parseEther(amount)
   // 1% fee
@@ -114,10 +131,11 @@ export async function buyFromCore(
 
   const txHash = await walletClient.writeContract({
     address: CONTRACT_ADDRESSES.CORE as `0x${string}`,
-    abi: NadFunAbi.ICore,
+    abi: coreAbi,
     functionName: 'buy',
     args: [amountIn, fee, tokenAddress, to, deadline],
     value: totalValue,
+    gas: 300000n, // Explicit gas limit
     chain: walletClient.chain,
     account: walletClient.account!,
   })
@@ -190,6 +208,7 @@ export async function exactOutBuyFromCore(
     functionName: 'exactOutBuy',
     args: [tokensOut, maxNativeIn, fee, tokenAddress, address, deadline],
     value: totalValue,
+    gas: 300000n, // Explicit gas limit
     chain: walletClient.chain,
     account: walletClient.account!,
   })
@@ -203,14 +222,14 @@ export async function exactOutBuyFromCore(
  * @param privateKey - Private key of the sender
  * @param tokenAddress - Token address to buy
  * @param amount - Amount of MON to spend
- * @param slippage - Slippage percentage (default 0.5%)
+ * @param slippage - Slippage percentage (default 10%)
  * @returns Transaction hash
  */
 export async function buyFromDex(
   privateKey: string,
   tokenAddress: string,
   amount: string,
-  slippage: number = 0.5,
+  slippage: number = 10,
 ): Promise<string> {
   // Create wallet client
   const walletClient = createWalletClientFromPrivateKey(privateKey)
@@ -252,13 +271,14 @@ export async function buyFromDex(
   const slippageFactor = 1000n - BigInt(Math.floor(slippage * 10))
   const minAmount = (expectedAmount * slippageFactor) / 1000n
 
-  // Submit transaction
+  // Submit transaction with explicit gas limit
   const txHash = await walletClient.writeContract({
     address: CONTRACT_ADDRESSES.UNISWAP_V2_ROUTER as `0x${string}`,
     abi: NadFunAbi.IUniswapV2Router,
     functionName: 'swapExactNativeForTokens',
     args: [minAmount, path, walletClient.account?.address, deadline],
     value: nativeAmountInWei,
+    gas: 300000n, // Explicit gas limit
     chain: walletClient.chain,
     account: walletClient.account!,
   })
@@ -312,6 +332,7 @@ export async function sellToDex(
       CONTRACT_ADDRESSES.UNISWAP_V2_ROUTER as `0x${string}`,
       tokenAmountInWei,
     ],
+    gas: 300000n, // Explicit gas limit
     chain: walletClient.chain,
     account: walletClient.account!,
   })
@@ -348,9 +369,22 @@ export async function sellToDex(
       walletClient.account?.address,
       deadline,
     ],
+    gas: 300000n, // Explicit gas limit
     chain: walletClient.chain,
     account: walletClient.account!,
   })
 
   return txHash
+}
+
+/**
+ * Gets the private key from environment variables
+ * @returns Private key from environment or throw error if not found
+ */
+export function getPrivateKeyFromEnv(): string {
+  const privateKey = process.env.PRIVATE_KEY
+  if (!privateKey) {
+    throw new Error('RIVATE_KEY not found in environment variables')
+  }
+  return privateKey
 }

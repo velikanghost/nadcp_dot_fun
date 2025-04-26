@@ -189,28 +189,28 @@ async function main() {
   // Token trading tools
   server.tool(
     'buy-tokens-from-curve',
-    'Buy tokens from bonding curve (only available in CURVE phase)',
+    'Buy tokens from bonding curve (only available in CURVE phase). ',
     buyFromCurveSchema,
     async (params) => buyTokensFromCurve(publicClient, params),
   )
 
   server.tool(
     'exact-out-buy-tokens-from-curve',
-    'Buy exact amount of tokens from bonding curve (only available in CURVE phase)',
+    'Buy exact amount of tokens from bonding curve (only available in CURVE phase). ',
     exactOutBuyFromCurveSchema,
     async (params) => exactOutBuyTokensFromCurve(publicClient, params),
   )
 
   server.tool(
     'buy-tokens-from-dex',
-    'Buy tokens from DEX (only available in DEX phase)',
+    'Buy tokens from DEX (only available in DEX phase). ',
     buyFromDexSchema,
     async (params) => buyTokensFromDex(publicClient, params),
   )
 
   server.tool(
     'sell-tokens-to-dex',
-    'Sell tokens to DEX (only available in DEX phase)',
+    'Sell tokens to DEX (only available in DEX phase). ',
     sellToDexSchema,
     async (params) => sellTokensToDex(publicClient, params),
   )

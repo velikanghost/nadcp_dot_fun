@@ -2,8 +2,6 @@ import { z } from 'zod'
 import { PublicClient } from 'viem'
 import axios from 'axios'
 
-// https://testnet-api-server.nad.fun/trade/holder/0x3421843c5f3808bB3BF90ec9B1c4dBC34D503061?tokenId=0x3421843c5f3808bB3BF90ec9B1c4dBC34D503061&page=1&limit=20
-// https://testnet-api-server.nad.fun/token/0xcd5FA74Ff2CB4cdbc1ccc3f4D7cf690e33D7baA0
 // Nad.fun API endpoints
 const NAD_FUN_API_BASE = 'https://testnet-api-server.nad.fun'
 const NAD_FUN_TOKEN_INFO = (tokenId: string) =>

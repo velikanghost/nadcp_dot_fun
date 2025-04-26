@@ -1,51 +1,41 @@
 import { z } from 'zod'
 import { PublicClient } from 'viem'
-import { parseEther } from 'viem/utils'
+import { parseEther, formatEther } from 'viem/utils'
 import {
   buyFromCore,
   exactOutBuyFromCore,
   buyFromDex,
   sellToDex,
+  getPrivateKeyFromEnv,
 } from '../api/nadfunRpc'
 import { NadfunApi } from '../api/nadfunApi'
 
 // Schema for buying tokens from bonding curve
 export const buyFromCurveSchema = {
-  privateKey: z
-    .string()
-    .describe('Private key of the sender (will not be stored)'),
   tokenAddress: z.string().describe('Token contract address to buy'),
   amount: z.string().describe('Amount of MON to spend'),
 }
 
 // Interface for buying tokens from bonding curve parameters
 export interface BuyFromCurveParams {
-  privateKey: string
   tokenAddress: string
   amount: string
 }
 
 // Schema for buying exact amount of tokens from bonding curve
 export const exactOutBuyFromCurveSchema = {
-  privateKey: z
-    .string()
-    .describe('Private key of the sender (will not be stored)'),
   tokenAddress: z.string().describe('Token contract address to buy'),
   tokensOut: z.string().describe('Exact amount of tokens to receive'),
 }
 
 // Interface for buying exact amount of tokens parameters
 export interface ExactOutBuyFromCurveParams {
-  privateKey: string
   tokenAddress: string
   tokensOut: string
 }
 
 // Schema for buying tokens from DEX
 export const buyFromDexSchema = {
-  privateKey: z
-    .string()
-    .describe('Private key of the sender (will not be stored)'),
   tokenAddress: z.string().describe('Token contract address to buy'),
   amount: z.string().describe('Amount of MON to spend'),
   slippage: z
@@ -57,7 +47,6 @@ export const buyFromDexSchema = {
 
 // Interface for buying tokens from DEX parameters
 export interface BuyFromDexParams {
-  privateKey: string
   tokenAddress: string
   amount: string
   slippage?: number
@@ -65,9 +54,6 @@ export interface BuyFromDexParams {
 
 // Schema for selling tokens to DEX
 export const sellToDexSchema = {
-  privateKey: z
-    .string()
-    .describe('Private key of the sender (will not be stored)'),
   tokenAddress: z.string().describe('Token contract address to sell'),
   amount: z.string().describe('Amount of tokens to sell'),
   slippage: z
@@ -79,7 +65,6 @@ export const sellToDexSchema = {
 
 // Interface for selling tokens to DEX parameters
 export interface SellToDexParams {
-  privateKey: string
   tokenAddress: string
   amount: string
   slippage?: number
@@ -88,9 +73,25 @@ export interface SellToDexParams {
 // Implementation of buying tokens from curve tool
 export const buyTokensFromCurve = async (
   client: PublicClient,
-  { privateKey, tokenAddress, amount }: BuyFromCurveParams,
+  { tokenAddress, amount }: BuyFromCurveParams,
 ) => {
   try {
+    // Get private key from environment variables
+    const privateKey = getPrivateKeyFromEnv()
+
+    // Validate amount to ensure it's a proper number
+    const numAmount = parseFloat(amount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid amount: ${amount}. Please provide a positive number.`,
+          },
+        ],
+      }
+    }
+
     // First, verify that the token is in bonding curve phase
     const marketInfo = await NadfunApi.getTokenMarket(tokenAddress)
 
@@ -105,30 +106,172 @@ export const buyTokensFromCurve = async (
       }
     }
 
-    // Calculate estimated output amount (basic estimate)
+    // Get token info for symbol
+    const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
+    let tokenSymbol = tokenInfo.symbol || 'tokens'
+
+    // Get wallet address from private key to check positions later
+    const { createWalletClientFromPrivateKey } = await import(
+      '../api/nadfunRpc'
+    )
+    const walletClient = createWalletClientFromPrivateKey(privateKey)
+    const walletAddress = walletClient.account?.address
+
+    // Get positions before purchase to compare later
+    let tokenAmountBefore = 0
+    try {
+      const positionsBefore = await NadfunApi.getAccountPositions(
+        walletAddress as string,
+        'open',
+      )
+      const tokenPosition = positionsBefore.positions.find(
+        (p) =>
+          p.token.token_address.toLowerCase() === tokenAddress.toLowerCase(),
+      )
+      if (tokenPosition) {
+        tokenAmountBefore = parseFloat(
+          formatEther(BigInt(tokenPosition.position.current_token_amount)),
+        )
+        tokenSymbol = tokenPosition.token.symbol
+      }
+    } catch (error) {
+      console.error('Error fetching positions before purchase:', error)
+    }
+
+    // Verify available tokens
+    const reserveToken = BigInt(marketInfo.reserve_token || '0')
+    const soldTokens = BigInt(marketInfo.reserve_native || '0')
+    const availableTokens =
+      reserveToken > soldTokens ? reserveToken - soldTokens : 0n
+
+    if (availableTokens <= 0n) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `No tokens available for purchase. This token may be fully sold out or already listed on DEX.`,
+          },
+        ],
+      }
+    }
+
+    // Estimate tokens received
     const virtualNative = BigInt(marketInfo.virtual_native || '0')
     const virtualToken = BigInt(marketInfo.virtual_token || '0')
     const amountInWei = parseEther(amount)
 
-    // Constant product formula k = virtualNative * virtualToken
-    // New virtualNative = oldVirtualNative + amountIn
-    // New virtualToken = k / newVirtualNative
-    // tokensOut = oldVirtualToken - newVirtualToken
+    // Use conservative estimate (some tokens might be sold between estimate and transaction)
     const k = virtualNative * virtualToken
     const newVirtualNative = virtualNative + amountInWei
     const newVirtualToken = k / newVirtualNative
     const estimatedTokensOut = virtualToken - newVirtualToken
 
-    // Execute transaction
-    const txHash = await buyFromCore(privateKey, tokenAddress, amount)
+    // Ensure we don't try to buy more than available
+    if (estimatedTokensOut > availableTokens) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `The requested MON amount would buy more tokens than available. Maximum available: ${availableTokens.toString()} tokens. Please use a smaller amount or use exactOutBuy to purchase the exact remaining tokens.`,
+          },
+        ],
+      }
+    }
 
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: `Successfully initiated purchase of approximately ${estimatedTokensOut.toString()} tokens for ${amount} MON.\n\nTransaction hash: ${txHash}\n\nNote: The exact token amount may vary slightly depending on other transactions that may have occurred.`,
-        },
-      ],
+    // Execute transaction with proper error handling
+    try {
+      const txHash = await buyFromCore(privateKey, tokenAddress, amount)
+
+      // Wait for transaction receipt and check status
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash as `0x${string}`,
+      })
+      if (receipt.status !== 'success') {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Transaction failed: Transaction reverted or ran out of gas.`,
+            },
+          ],
+        }
+      }
+
+      // Get positions after purchase to calculate tokens received
+      let tokenAmountReceived = 0
+      try {
+        // Wait a short time for blockchain state to update
+        await new Promise((resolve) => setTimeout(resolve, 3000))
+
+        const positionsAfter = await NadfunApi.getAccountPositions(
+          walletAddress as string,
+          'open',
+        )
+        const tokenPosition = positionsAfter.positions.find(
+          (p) =>
+            p.token.token_address.toLowerCase() === tokenAddress.toLowerCase(),
+        )
+        if (tokenPosition) {
+          const tokenAmountAfter = parseFloat(
+            formatEther(BigInt(tokenPosition.position.current_token_amount)),
+          )
+          tokenAmountReceived = tokenAmountAfter - tokenAmountBefore
+          tokenSymbol = tokenPosition.token.symbol
+        }
+      } catch (error) {
+        console.error('Error fetching positions after purchase:', error)
+      }
+
+      // Format estimatedTokensOut from wei to standard units
+      const estimatedTokensOutStandard = parseFloat(
+        formatEther(estimatedTokensOut),
+      ).toFixed(5)
+
+      let message = `Successfully purchased approximately ${estimatedTokensOutStandard} ${tokenSymbol} for ${amount} MON.`
+      if (tokenAmountReceived > 0) {
+        message = `Successfully purchased ${tokenAmountReceived.toFixed(
+          5,
+        )} ${tokenSymbol} for ${amount} MON.`
+      }
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `${message}\n\nTransaction hash: ${txHash}`,
+          },
+        ],
+      }
+    } catch (txError: any) {
+      // Handle specific transaction errors
+      console.log('txError', txError)
+      if (txError.message && txError.message.includes('insufficient balance')) {
+        // Calculate total cost including fee
+        const amountInWei = parseEther(amount)
+        const fee = (amountInWei * 10n) / 1000n
+        const totalCost = amountInWei + fee
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Transaction failed: Insufficient balance. The total cost including 1% fee is ${totalCost.toString()} wei (${amount} MON + ${fee.toString()} wei fee). Please ensure your wallet has enough MON to cover this amount plus gas fees.`,
+            },
+          ],
+        }
+      }
+
+      // Generic error handling
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Error buying tokens from curve: ${
+              txError.message || 'Unknown error'
+            }. Please try again later.`,
+          },
+        ],
+      }
     }
   } catch (error) {
     console.error('Error buying tokens from curve:', error)
@@ -148,9 +291,12 @@ export const buyTokensFromCurve = async (
 // Implementation of buying exact amount of tokens from curve tool
 export const exactOutBuyTokensFromCurve = async (
   client: PublicClient,
-  { privateKey, tokenAddress, tokensOut }: ExactOutBuyFromCurveParams,
+  { tokenAddress, tokensOut }: ExactOutBuyFromCurveParams,
 ) => {
   try {
+    // Get private key from environment variables
+    const privateKey = getPrivateKeyFromEnv()
+
     // First, verify that the token is in bonding curve phase
     const marketInfo = await NadfunApi.getTokenMarket(tokenAddress)
 
@@ -237,9 +383,12 @@ export const exactOutBuyTokensFromCurve = async (
 // Implementation of buying tokens from DEX tool
 export const buyTokensFromDex = async (
   client: PublicClient,
-  { privateKey, tokenAddress, amount, slippage = 0.5 }: BuyFromDexParams,
+  { tokenAddress, amount, slippage = 0.5 }: BuyFromDexParams,
 ) => {
   try {
+    // Get private key from environment variables
+    const privateKey = getPrivateKeyFromEnv()
+
     // Check if the token is in DEX phase
     const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
 
@@ -254,14 +403,90 @@ export const buyTokensFromDex = async (
       }
     }
 
+    // Get wallet address from private key to check positions later
+    const { createWalletClientFromPrivateKey } = await import(
+      '../api/nadfunRpc'
+    )
+    const walletClient = createWalletClientFromPrivateKey(privateKey)
+    const walletAddress = walletClient.account?.address
+
+    // Get positions before purchase to compare later
+    let tokenAmountBefore = 0
+    let tokenSymbol = tokenInfo.symbol || 'tokens'
+    try {
+      const positionsBefore = await NadfunApi.getAccountPositions(
+        walletAddress as string,
+        'open',
+      )
+      const tokenPosition = positionsBefore.positions.find(
+        (p) =>
+          p.token.token_address.toLowerCase() === tokenAddress.toLowerCase(),
+      )
+      if (tokenPosition) {
+        tokenAmountBefore = parseFloat(
+          formatEther(BigInt(tokenPosition.position.current_token_amount)),
+        )
+        tokenSymbol = tokenPosition.token.symbol
+      }
+    } catch (error) {
+      console.error('Error fetching positions before purchase:', error)
+    }
+
     // Execute transaction
     const txHash = await buyFromDex(privateKey, tokenAddress, amount, slippage)
+
+    // Wait for transaction receipt and check status
+    const receipt = await client.waitForTransactionReceipt({
+      hash: txHash as `0x${string}`,
+    })
+    if (receipt.status !== 'success') {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Transaction failed: Transaction reverted or ran out of gas.`,
+          },
+        ],
+      }
+    }
+
+    // Get positions after purchase to calculate tokens received
+    let tokenAmountReceived = 0
+    try {
+      // Wait a short time for blockchain state to update
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
+      const positionsAfter = await NadfunApi.getAccountPositions(
+        walletAddress as string,
+        'open',
+      )
+      const tokenPosition = positionsAfter.positions.find(
+        (p) =>
+          p.token.token_address.toLowerCase() === tokenAddress.toLowerCase(),
+      )
+      if (tokenPosition) {
+        const tokenAmountAfter = parseFloat(
+          formatEther(BigInt(tokenPosition.position.current_token_amount)),
+        )
+        tokenAmountReceived = tokenAmountAfter - tokenAmountBefore
+        tokenSymbol = tokenPosition.token.symbol
+      }
+    } catch (error) {
+      console.error('Error fetching positions after purchase:', error)
+    }
+
+    let message = `Successfully purchased tokens for ${amount} MON with ${slippage}% slippage.`
+    if (tokenAmountReceived > 0) {
+      message = `Successfully purchased ${tokenAmountReceived.toFixed(
+        5,
+      )} ${tokenSymbol} for ${amount} MON with ${slippage}% slippage.`
+    }
 
     return {
       content: [
         {
           type: 'text' as const,
-          text: `Successfully initiated purchase of tokens for ${amount} MON with ${slippage}% slippage.\n\nTransaction hash: ${txHash}`,
+          text: `${message}\n\nTransaction hash: ${txHash}`,
         },
       ],
     }
@@ -283,9 +508,12 @@ export const buyTokensFromDex = async (
 // Implementation of selling tokens to DEX tool
 export const sellTokensToDex = async (
   client: PublicClient,
-  { privateKey, tokenAddress, amount, slippage = 0.5 }: SellToDexParams,
+  { tokenAddress, amount, slippage = 0.5 }: SellToDexParams,
 ) => {
   try {
+    // Get private key from environment variables
+    const privateKey = getPrivateKeyFromEnv()
+
     // Check if the token is in DEX phase
     const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
 
@@ -303,11 +531,14 @@ export const sellTokensToDex = async (
     // Execute transaction
     const txHash = await sellToDex(privateKey, tokenAddress, amount, slippage)
 
+    // Convert amount to standard units for display
+    const amountStandard = parseFloat(amount).toFixed(5)
+
     return {
       content: [
         {
           type: 'text' as const,
-          text: `Successfully initiated sale of ${amount} tokens with ${slippage}% slippage.\n\nTransaction hash: ${txHash}`,
+          text: `Successfully initiated sale of ${amountStandard} tokens with ${slippage}% slippage.\n\nTransaction hash: ${txHash}`,
         },
       ],
     }
