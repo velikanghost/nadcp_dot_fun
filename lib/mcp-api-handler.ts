@@ -19,7 +19,7 @@ export function initializeMcpApiHandler(
   initializeServer: (server: McpServer) => void,
   serverOptions: ServerOptions = {},
 ) {
-  const redisUrl = process.env.REDIS_URL || process.env.KV_URL
+  const redisUrl = process.env.REDIS_REMOTE_REDIS_URL || process.env.KV_URL
   if (!redisUrl) {
     throw new Error('REDIS_URL environment variable is not set')
   }
