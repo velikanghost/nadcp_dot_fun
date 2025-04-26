@@ -11,6 +11,8 @@ This MCP server provides tools for:
 - Retrieving account positions and created tokens
 - Listing tokens by various criteria (creation time, market cap, latest trade)
 - Fetching token market data, chart information, swap history, and holder lists
+- Getting information about market types (CURVE and DEX)
+- Buying and selling tokens through bonding curve or DEX
 
 All data is fetched directly from the Nad.fun API in real-time, with no mock data.
 
@@ -147,6 +149,76 @@ Parameters:
 - `tokenAddress` (string): Token contract address
 - `page` (number, default: 1): Page number
 - `limit` (number, default: 10): Number of items per page
+
+### Market Info Tools
+
+#### market-type-info
+
+Get detailed information about a specific market type.
+
+Parameters:
+
+- `marketType` (enum: 'CURVE', 'DEX'): Market type to get information about
+
+#### market-type-comparison
+
+Get a comparison between CURVE and DEX market types.
+
+Parameters:
+
+- None
+
+#### token-market-phase
+
+Get detailed information about a token's current market phase.
+
+Parameters:
+
+- `tokenAddress` (string): Token contract address to check
+
+### Token Trading Tools
+
+#### buy-tokens-from-curve
+
+Buy tokens from bonding curve (only available in CURVE phase).
+
+Parameters:
+
+- `privateKey` (string): Private key of the sender (will not be stored)
+- `tokenAddress` (string): Token contract address to buy
+- `amount` (string): Amount of MON to spend
+
+#### exact-out-buy-tokens-from-curve
+
+Buy exact amount of tokens from bonding curve (only available in CURVE phase). This is useful for purchasing the remaining tokens to trigger DEX listing.
+
+Parameters:
+
+- `privateKey` (string): Private key of the sender (will not be stored)
+- `tokenAddress` (string): Token contract address to buy
+- `tokensOut` (string): Exact amount of tokens to receive
+
+#### buy-tokens-from-dex
+
+Buy tokens from DEX (only available in DEX phase).
+
+Parameters:
+
+- `privateKey` (string): Private key of the sender (will not be stored)
+- `tokenAddress` (string): Token contract address to buy
+- `amount` (string): Amount of MON to spend
+- `slippage` (number, default: 0.5): Slippage percentage
+
+#### sell-tokens-to-dex
+
+Sell tokens to DEX (only available in DEX phase).
+
+Parameters:
+
+- `privateKey` (string): Private key of the sender (will not be stored)
+- `tokenAddress` (string): Token contract address to sell
+- `amount` (string): Amount of tokens to sell
+- `slippage` (number, default: 0.5): Slippage percentage
 
 ## API Integration
 

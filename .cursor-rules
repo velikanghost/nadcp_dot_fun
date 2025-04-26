@@ -1,0 +1,23 @@
+# Cursor Development Rules
+
+## Data Sources
+
+- DO NOT use mock data in any implementation
+- Always implement real API calls to retrieve data from the blockchain
+- Use Monad testnet for all blockchain interactions
+- Connect to actual Nad.fun contracts and APIs for token information
+- Use viem client to make direct RPC calls to the Monad network
+
+## Implementation Guidelines
+
+- Focus on real-time data retrieval and processing
+- Implement proper error handling for API failures
+- Use caching strategically for performance, not for avoiding real data
+- Ensure all tools return actual blockchain data
+- Prioritize accuracy of token information over convenience
+
+## Development Priorities
+
+- Real blockchain integration is highest priority
+- API design should match real-world usage patterns
+- Testing should use actual Monad testnet, not mock responses

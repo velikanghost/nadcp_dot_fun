@@ -14,6 +14,9 @@ importers:
       axios:
         specifier: ^1.8.2
         version: 1.8.4
+      contract-abi:
+        specifier: https://github.com/Naddotfun/contract-abi.git#v0.3.0
+        version: contract-abi.git#v0.3.0@https://codeload.github.com/Naddotfun/contract-abi/tar.gz/80d2ad35fb93a1cdfa6006a275f702df32015a84
       typescript:
         specifier: ^5.8.2
         version: 5.8.3
@@ -105,6 +108,10 @@ packages:
   content-type@1.0.5:
     resolution: {integrity: sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA==}
     engines: {node: '>= 0.6'}
+
+  contract-abi.git#v0.3.0@https://codeload.github.com/Naddotfun/contract-abi/tar.gz/80d2ad35fb93a1cdfa6006a275f702df32015a84:
+    resolution: {tarball: https://codeload.github.com/Naddotfun/contract-abi/tar.gz/80d2ad35fb93a1cdfa6006a275f702df32015a84}
+    version: 0.0.0
 
   cookie-signature@1.2.2:
     resolution: {integrity: sha512-D76uU73ulSXrD1UXF4KE2TMxVVwhsnCgfAyTg9k8P6KGZjlXKrOLe4dJQKI3Bxi5wjesZoFXJWElNWBjPZMbhg==}
@@ -571,6 +578,8 @@ snapshots:
       safe-buffer: 5.2.1
 
   content-type@1.0.5: {}
+
+  contract-abi.git#v0.3.0@https://codeload.github.com/Naddotfun/contract-abi/tar.gz/80d2ad35fb93a1cdfa6006a275f702df32015a84: {}
 
   cookie-signature@1.2.2: {}
 
