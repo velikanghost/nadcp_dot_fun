@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { PublicClient } from 'viem'
+import { parseEther, formatEther } from 'viem/utils'
 import { NadfunApi } from '../api/nadfunApi'
 
 // Schema for account positions
@@ -28,11 +29,102 @@ export const accountCreatedTokensSchema = {
   limit: z.number().optional().default(10).describe('Number of items per page'),
 }
 
+// Schema for wallet balance
+export const walletBalanceSchema = {
+  accountAddress: z.string().describe('Account EOA address'),
+}
+
 // Interface for account created tokens parameters
 export interface AccountCreatedTokensParams {
   accountAddress: string
   page?: number
   limit?: number
+}
+
+// Interface for wallet balance parameters
+export interface WalletBalanceParams {
+  accountAddress: string
+}
+
+//Implementation of wallet balance tool
+export const getWalletBalance = async (
+  client: PublicClient,
+  { accountAddress }: WalletBalanceParams,
+) => {
+  const balance = await client.getBalance({
+    address: accountAddress as `0x${string}`,
+  })
+  return {
+    content: [{ type: 'text' as const, text: `Wallet balance: ${balance}` }],
+  }
+}
+
+//Interface for transfer parameters
+export interface TransferParams {
+  privateKey: string
+  accountAddress: string
+  amount: string
+}
+
+// Schema for transfer MON
+export const transferMONSchema = {
+  privateKey: z
+    .string()
+    .describe('Private key of the sender (will not be stored)'),
+  accountAddress: z.string().describe('Account address to receive MON'),
+  amount: z.string().describe('Amount of MON to transfer'),
+}
+
+//Implementation of transfer tool
+export const transferMON = async (
+  client: PublicClient,
+  { privateKey, accountAddress, amount }: TransferParams,
+) => {
+  try {
+    // Import the actual transfer implementation function
+    const { transfer, createWalletClientFromPrivateKey } = await import(
+      '../api/nadfunRpc'
+    )
+
+    // Get sender address from private key
+    const walletClient = createWalletClientFromPrivateKey(privateKey)
+    const senderAddress = walletClient.account?.address as `0x${string}`
+
+    // Get balance before transfer
+    const balanceBefore = await client.getBalance({ address: senderAddress })
+
+    // Execute the transfer
+    const txHash = await transfer(privateKey, accountAddress, amount)
+
+    // Get balance after transfer
+    const balanceAfter = await client.getBalance({ address: senderAddress })
+
+    // Calculate the difference including gas fees
+    const totalCost = balanceBefore - balanceAfter
+    const gasUsed = totalCost - parseEther(amount)
+
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Successfully transferred ${amount} MON to ${accountAddress}\n\nTransaction Hash: ${txHash}\nRemaining Balance: ${formatEther(
+            balanceAfter,
+          )} MON\nGas Used: ${formatEther(gasUsed)} MON`,
+        },
+      ],
+    }
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error transferring MON: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+        },
+      ],
+    }
+  }
 }
 
 // Implementation of account positions tool
@@ -72,15 +164,23 @@ export const getAccountPositions = async (
     response.positions.forEach((item, index) => {
       const { token, position, market } = item
 
+      // Convert token amounts from wei to standard units
+      const currentAmount = parseFloat(
+        formatEther(BigInt(position.current_token_amount)),
+      ).toFixed(5)
+      const totalBoughtToken = parseFloat(
+        formatEther(BigInt(position.total_bought_token)),
+      ).toFixed(5)
+
       positionsText += `## ${index + 1}. ${token.name} (${token.symbol})\n`
       positionsText += `- Token Address: ${token.token_address}\n`
-      positionsText += `- Current Amount: ${position.current_token_amount}\n`
-      positionsText += `- Total Bought (Native): ${position.total_bought_native}\n`
-      positionsText += `- Total Bought (Token): ${position.total_bought_token}\n`
-      positionsText += `- Realized PnL: ${position.realized_pnl}\n`
-      positionsText += `- Unrealized PnL: ${position.unrealized_pnl}\n`
-      positionsText += `- Total PnL: ${position.total_pnl}\n`
-      positionsText += `- Current Price: ${market.price}\n`
+      positionsText += `- Current Amount: ${currentAmount} ${token.symbol}\n`
+      positionsText += `- Total Bought (MON): ${position.total_bought_native}\n`
+      positionsText += `- Total Bought (Token): ${totalBoughtToken} ${token.symbol}\n`
+      positionsText += `- Realized PnL (MON): ${position.realized_pnl}\n`
+      positionsText += `- Unrealized PnL (MON): ${position.unrealized_pnl}\n`
+      positionsText += `- Total PnL (MON): ${position.total_pnl}\n`
+      positionsText += `- Current Price: ${market.price} MON\n`
       positionsText += `- Market Type: ${market.market_type}\n`
       positionsText += `- Last Traded: ${new Date(
         position.last_traded_at * 1000,
@@ -149,11 +249,11 @@ export const getAccountCreatedTokens = async (
       tokensText += `- Total Supply: ${token.total_supply}\n`
 
       if (token.price) {
-        tokensText += `- Current Price: ${token.price}\n`
+        tokensText += `- Current Price: ${token.price} MON\n`
       }
 
       if (token.market_cap) {
-        tokensText += `- Market Cap: ${token.market_cap}\n`
+        tokensText += `- Market Cap: ${token.market_cap} MON\n`
       }
 
       if (token.current_amount) {

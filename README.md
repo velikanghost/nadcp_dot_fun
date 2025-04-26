@@ -1,179 +1,109 @@
-# Nad.fun MCP Server
+# Naddotfun MCP Server built using Next.js
 
-A Model Context Protocol (MCP) server for interacting with the Nad.fun platform on the Monad blockchain.
+This project provides a Model Context Protocol (MCP) server for interacting with the Nad.fun platform on the Monad blockchain, built using Next.js and Server-Sent Events (SSE).
 
 ## Features
 
-This MCP server provides tools for:
+- Implements the MCP protocol via Server-Sent Events
+- Provides tools for interacting with Nad.fun on Monad blockchain
+- Supports token searching, market information, token trading, and more
+- Easy to deploy on Vercel with Redis
+- Wallet integration for token transactions
 
-- Searching tokens on Nad.fun by name or symbol
-- Getting detailed statistics for specific tokens
-- Retrieving account positions and created tokens
-- Listing tokens by various criteria (creation time, market cap, latest trade)
-- Fetching token market data, chart information, swap history, and holder lists
+## Available Tools
 
-All data is fetched directly from the Nad.fun API in real-time, with no mock data.
+The server provides the following Nad.fun tools:
 
-## Installation
+### Wallet Operations
 
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/nad-fun-mcp.git
-cd nad-fun-mcp
-
-# Install dependencies
-pnpm install
-```
-
-## Usage
-
-```bash
-# Build the project
-pnpm build
-```
-
-This will start the server using the standard input/output transport layer, allowing AI assistants to interact with it.
-
-## Tools
+- `get-mon-balance`: Check MON balance for a Monad address
+- `transfer-mon`: Transfer MON to another Monad address
 
 ### Token Search and Information
 
-#### search-tokens
+- `search-tokens`: Search for tokens by name or symbol
+- `token-stats`: Get detailed stats for a specific token
 
-Search for tokens on Nad.fun by name or symbol.
+### Account Information
 
-Parameters:
+- `account-positions`: Get token positions held by an account
+- `account-created-tokens`: Get tokens created by a specific account
 
-- `query` (string): Token name or symbol to search for
-- `limit` (number, default: 10): Maximum number of results to return
+### Token Listings
 
-#### token-stats
+- `list-tokens-by-creation-time`: Get tokens ordered by creation time
+- `list-tokens-by-market-cap`: Get tokens ordered by market cap
+- `list-tokens-by-latest-trade`: Get tokens ordered by latest trade time
 
-Get detailed statistics for a specific Nad.fun token.
+### Token Details
 
-Parameters:
+- `token-chart`: Get chart data for a specific token
+- `token-swap-history`: Get swap history for a specific token
+- `token-market`: Get market information for a specific token
+- `token-holders`: Get list of holders for a specific token
 
-- `tokenAddress` (string): Token contract address
-- `includeSocialData` (boolean, default: true): Include social engagement metrics
+### Market Information
 
-### Account Related Tools
+- `market-type-info`: Get information about a specific market type
+- `market-type-comparison`: Compare CURVE and DEX market types
+- `token-market-phase`: Get information about a token's market phase
 
-#### account-positions
+### Token Trading
 
-Get token positions held by an account.
+- `buy-tokens-from-curve`: Buy tokens from bonding curve
+- `exact-out-buy-tokens-from-curve`: Buy exact amount of tokens from curve
+- `buy-tokens-from-dex`: Buy tokens from DEX
+- `sell-tokens-to-dex`: Sell tokens to DEX
 
-Parameters:
+## How to add new tools
 
-- `accountAddress` (string): Account EOA address
-- `positionType` (enum: 'all', 'open', 'close', default: 'open'): Type of positions to retrieve
-- `page` (number, default: 1): Page number
-- `limit` (number, default: 10): Number of items per page
+Update `app/mcp.ts` with your tools, prompts, and resources following the [MCP TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
 
-#### account-created-tokens
+## Notes for running on Vercel
 
-Get tokens created by a specific account.
+- Requires a Redis attached to the project under `process.env.REDIS_URL`
+- Make sure you have [Fluid compute](https://vercel.com/docs/functions/fluid-compute) enabled for efficient execution
+- After enabling Fluid compute, open `app/sse/route.ts` and adjust max duration to 800 if you are using a Vercel Pro or Enterprise account
+- [Deploy the Next.js MCP template](https://vercel.com/templates/next.js/model-context-protocol-mcp-with-next-js)
 
-Parameters:
+## Sample Client
 
-- `accountAddress` (string): Account EOA address
-- `page` (number, default: 1): Page number
-- `limit` (number, default: 10): Number of items per page
+`scripts/test-client.mjs` contains a sample client to try tool invocations:
 
-### Token Listing Tools
+```sh
+npm run test-client -- http://localhost:3000
+```
 
-#### list-tokens-by-creation-time
+This will test a few of the available tools and display the results.
 
-Get tokens ordered by creation time (newest first).
+## Running locally
 
-Parameters:
+1. Clone the repository
+2. Install dependencies with `npm install` or `pnpm install`
+3. Start a local Redis instance
+4. Set the `REDIS_URL` environment variable
+5. Run `npm run dev` to start the development server
+6. Test with `npm run test-client -- http://localhost:3000`
 
-- `page` (number, default: 1): Page number
-- `limit` (number, default: 10): Number of items per page
+## How to use the server with Cursor
 
-#### list-tokens-by-market-cap
+Go to `Cursor > Settings > Cursor Settings > MCP`
 
-Get tokens ordered by market cap (highest first).
+![add_mcp](/static/add_mcp.png)
 
-Parameters:
+Paste the following in the `mcp.json` file:
 
-- `page` (number, default: 1): Page number
-- `limit` (number, default: 10): Number of items per page
-
-#### list-tokens-by-latest-trade
-
-Get tokens ordered by latest trade time.
-
-Parameters:
-
-- `page` (number, default: 1): Page number
-- `limit` (number, default: 10): Number of items per page
-
-### Token Details Tools
-
-#### token-chart
-
-Get chart data for a specific token.
-
-Parameters:
-
-- `tokenAddress` (string): Token contract address
-- `interval` (enum: '1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', default: '1h'): Chart interval
-- `baseTimestamp` (number, optional): Base timestamp for the chart (current time if not provided)
-
-#### token-swap-history
-
-Get swap history for a specific token.
-
-Parameters:
-
-- `tokenAddress` (string): Token contract address
-- `page` (number, default: 1): Page number
-- `limit` (number, default: 10): Number of items per page
-
-#### token-market
-
-Get market information for a specific token.
-
-Parameters:
-
-- `tokenAddress` (string): Token contract address
-
-#### token-holders
-
-Get list of holders for a specific token.
-
-Parameters:
-
-- `tokenAddress` (string): Token contract address
-- `page` (number, default: 1): Page number
-- `limit` (number, default: 10): Number of items per page
-
-## API Integration
-
-This server integrates with the Nad.fun API:
-
-- Base API endpoint: `https://testnet-bot-api-server.nad.fun/`
-
-### Endpoints used:
-
-- Account endpoints:
-
-  - `/account/position/{account_address}` - Get account positions
-  - `/account/create_token/{account_address}` - Get tokens created by account
-
-- Order endpoints:
-
-  - `/order/creation_time` - Get tokens by creation time
-  - `/order/market_cap` - Get tokens by market cap
-  - `/order/latest_trade` - Get tokens by latest trade
-
-- Token endpoints:
-  - `/token/{token}` - Get token information
-  - `/token/chart/{token}` - Get token chart data
-  - `/token/swap/{token}` - Get token swap history
-  - `/token/market/{token}` - Get token market information
-  - `/token/holder/{token}` - Get token holders
-
-## License
-
-ISC
+```json
+{
+  "mcpServers": {
+    "nadcp-dot-fun": {
+      "url": "[your_app_vercel_url]/sse",
+      "env": {
+        "PRIVATE_KEY": "",
+        "ALCHEMY_API_KEY": "",
+        "REDIS_URL": "redis://localhost:6379"
+      }
+    }
+  }
+}
+```
