@@ -384,7 +384,7 @@ export async function sellToDex(
 export function getPrivateKeyFromEnv(): string {
   const privateKey = process.env.PRIVATE_KEY
   if (!privateKey) {
-    throw new Error('RIVATE_KEY not found in environment variables')
+    throw new Error('PRIVATE_KEY not found in environment variables')
   }
   return privateKey
 }
