@@ -12,7 +12,7 @@ import { NadfunApi } from '../api/nadfunApi'
 import { createClient } from 'redis'
 
 // Schema for buying tokens from bonding curve
-export const buyFromCurveSchema = z.object({
+export const buyFromCurveSchema = {
   tokenAddress: z.string().describe('Token contract address to buy'),
   amount: z.string().describe('Amount of MON to spend'),
   privateKey: z
@@ -23,7 +23,7 @@ export const buyFromCurveSchema = z.object({
     .string()
     .optional()
     .describe('Session ID for authenticated users'),
-})
+}
 
 // Interface for buying tokens from bonding curve parameters
 export interface BuyFromCurveParams {
@@ -34,7 +34,7 @@ export interface BuyFromCurveParams {
 }
 
 // Schema for buying exact amount of tokens from bonding curve
-export const exactOutBuyFromCurveSchema = z.object({
+export const exactOutBuyFromCurveSchema = {
   tokenAddress: z.string().describe('Token contract address to buy'),
   tokensOut: z.string().describe('Exact amount of tokens to receive'),
   privateKey: z
@@ -45,7 +45,7 @@ export const exactOutBuyFromCurveSchema = z.object({
     .string()
     .optional()
     .describe('Session ID for authenticated users'),
-})
+}
 
 // Interface for buying exact amount of tokens parameters
 export interface ExactOutBuyFromCurveParams {
@@ -56,12 +56,13 @@ export interface ExactOutBuyFromCurveParams {
 }
 
 // Schema for buying tokens from DEX
-export const buyFromDexSchema = z.object({
+export const buyFromDexSchema = {
   tokenAddress: z.string().describe('Token contract address to buy'),
   amount: z.string().describe('Amount of MON to spend'),
   slippage: z
     .number()
     .optional()
+    .default(0.5)
     .describe('Slippage percentage (default 0.5%)'),
   privateKey: z
     .string()
@@ -71,7 +72,7 @@ export const buyFromDexSchema = z.object({
     .string()
     .optional()
     .describe('Session ID for authenticated users'),
-})
+}
 
 // Interface for buying tokens from DEX parameters
 export interface BuyFromDexParams {
@@ -489,7 +490,14 @@ export async function buyTokensFromDex(
       }
 
       const result = await response.json()
-      return `Transaction sent using your authenticated wallet: ${result.transaction.hash}\nWait for confirmation...`
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Transaction sent using your authenticated wallet: ${result.transaction.hash}\nWait for confirmation...`,
+          },
+        ],
+      }
     }
 
     // Otherwise, fall back to using the provided private key
