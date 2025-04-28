@@ -9,50 +9,29 @@ import {
   getPrivateKeyFromEnv,
 } from '../api/nadfunRpc'
 import { NadfunApi } from '../api/nadfunApi'
-import { createClient } from 'redis'
 
 // Schema for buying tokens from bonding curve
 export const buyFromCurveSchema = {
   tokenAddress: z.string().describe('Token contract address to buy'),
   amount: z.string().describe('Amount of MON to spend'),
-  privateKey: z
-    .string()
-    .optional()
-    .describe('Private key of the sender (will not be stored)'),
-  sessionId: z
-    .string()
-    .optional()
-    .describe('Session ID for authenticated users'),
 }
 
 // Interface for buying tokens from bonding curve parameters
 export interface BuyFromCurveParams {
   tokenAddress: string
   amount: string
-  privateKey?: string
-  sessionId?: string
 }
 
 // Schema for buying exact amount of tokens from bonding curve
 export const exactOutBuyFromCurveSchema = {
   tokenAddress: z.string().describe('Token contract address to buy'),
   tokensOut: z.string().describe('Exact amount of tokens to receive'),
-  privateKey: z
-    .string()
-    .optional()
-    .describe('Private key of the sender (will not be stored)'),
-  sessionId: z
-    .string()
-    .optional()
-    .describe('Session ID for authenticated users'),
 }
 
 // Interface for buying exact amount of tokens parameters
 export interface ExactOutBuyFromCurveParams {
   tokenAddress: string
   tokensOut: string
-  privateKey?: string
-  sessionId?: string
 }
 
 // Schema for buying tokens from DEX
@@ -64,14 +43,6 @@ export const buyFromDexSchema = {
     .optional()
     .default(0.5)
     .describe('Slippage percentage (default 0.5%)'),
-  privateKey: z
-    .string()
-    .optional()
-    .describe('Private key of the sender (will not be stored)'),
-  sessionId: z
-    .string()
-    .optional()
-    .describe('Session ID for authenticated users'),
 }
 
 // Interface for buying tokens from DEX parameters
@@ -79,8 +50,6 @@ export interface BuyFromDexParams {
   tokenAddress: string
   amount: string
   slippage?: number
-  privateKey?: string
-  sessionId?: string
 }
 
 // Schema for selling tokens to DEX
@@ -99,44 +68,6 @@ export interface SellToDexParams {
   tokenAddress: string
   amount: string
   slippage?: number
-}
-
-// Add this helper function to get wallet information from session
-export async function getWalletFromSession(sessionId: string) {
-  // Skip if no session ID
-  if (!sessionId) {
-    return null
-  }
-
-  // Get Redis URL from environment
-  const redisUrl = process.env.REDIS_REMOTE_REDIS_URL || process.env.KV_URL
-  if (!redisUrl) {
-    return null
-  }
-
-  try {
-    // Connect to Redis
-    const redis = createClient({ url: redisUrl })
-    redis.on('error', (err) => console.error('Redis error', err))
-
-    await redis.connect()
-
-    // Get auth data
-    const authData = await redis.get(`auth:${sessionId}`)
-    await redis.disconnect()
-
-    // If no auth data, return null
-    if (!authData) {
-      return null
-    }
-
-    // Parse auth data and return wallet if available
-    const authInfo = JSON.parse(authData)
-    return authInfo.wallet || null
-  } catch (error) {
-    console.error('Error retrieving wallet from session:', error)
-    return null
-  }
 }
 
 // Implementation of buying tokens from curve tool
@@ -450,62 +381,13 @@ export const exactOutBuyTokensFromCurve = async (
 }
 
 // Implementation of buying tokens from DEX tool
-export async function buyTokensFromDex(
+export const buyTokensFromDex = async (
   client: PublicClient,
-  {
-    tokenAddress,
-    amount,
-    slippage = 0.5,
-    privateKey,
-    sessionId,
-  }: BuyFromDexParams,
-) {
+  { tokenAddress, amount, slippage = 0.5 }: BuyFromDexParams,
+) => {
   try {
-    // First check if there's a session with a wallet
-    let walletInfo = null
-    if (sessionId) {
-      walletInfo = await getWalletFromSession(sessionId)
-    }
-
-    // If we have a wallet from the session, use it
-    if (walletInfo) {
-      // Make API call to the wallet endpoint to process the transaction
-      const response = await fetch(`/api/wallet?sessionId=${sessionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          operation: 'send_transaction',
-          params: {
-            to: tokenAddress, // The contract address
-            amount: amount, // The amount to send
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Transaction failed')
-      }
-
-      const result = await response.json()
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Transaction sent using your authenticated wallet: ${result.transaction.hash}\nWait for confirmation...`,
-          },
-        ],
-      }
-    }
-
-    // Otherwise, fall back to using the provided private key
-    if (!privateKey) {
-      throw new Error(
-        'PRIVATE_KEY not found and no authenticated wallet available. Please provide a private key or authenticate with Google.',
-      )
-    }
+    // Get private key from environment variables
+    const privateKey = getPrivateKeyFromEnv()
 
     // Check if the token is in DEX phase
     const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)

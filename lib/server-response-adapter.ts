@@ -100,20 +100,6 @@ export function createServerResponseAdapter(
 
     const head = await writeHeadPromise
 
-    // Set default headers if not provided
-    if (!head.headers) {
-      head.headers = {}
-    }
-    if (!head.headers['Content-Type']) {
-      head.headers['Content-Type'] = 'text/event-stream'
-    }
-    if (!head.headers['Cache-Control']) {
-      head.headers['Cache-Control'] = 'no-cache'
-    }
-    if (!head.headers['Connection']) {
-      head.headers['Connection'] = 'keep-alive'
-    }
-
     const response = new Response(
       new ReadableStream({
         start(c) {
