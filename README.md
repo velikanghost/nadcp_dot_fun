@@ -9,6 +9,9 @@ This project provides a Model Context Protocol (MCP) server for interacting with
 - Supports token searching, market information, token trading, and more
 - Easy to deploy on Vercel with Redis
 - Wallet integration for token transactions
+- Compatible with Claude Desktop via mcp-remote
+- Google OAuth authentication for secure access
+- Privy wallet integration for seamless transaction signing
 
 ## Available Tools
 
@@ -55,6 +58,30 @@ The server provides the following Nad.fun tools:
 - `buy-tokens-from-dex`: Buy tokens from DEX
 - `sell-tokens-to-dex`: Sell tokens to DEX
 
+## Authentication
+
+This MCP server supports Google OAuth authentication to secure access to the API endpoints. When enabled, users will be redirected to Google's login page before accessing the MCP tools.
+
+To set up authentication:
+
+1. Create OAuth credentials in Google Cloud Console
+2. Add environment variables to your deployment
+3. Enable authentication by setting `REQUIRE_AUTH=true`
+
+For detailed setup instructions, see [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md).
+
+## Privy Wallet Integration
+
+When a user authenticates with Google, the system automatically creates a Privy wallet that can be used for transactions. This means users don't need to enter their private keys when performing operations like buying or selling tokens.
+
+To set up Privy:
+
+1. Create a Privy account and app
+2. Get your App ID, App Secret, and generate an authorization key
+3. Add these credentials to your environment variables
+
+For detailed setup instructions, see [PRIVY_SETUP.md](PRIVY_SETUP.md).
+
 ## How to add new tools
 
 Update `app/mcp.ts` with your tools, prompts, and resources following the [MCP TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
@@ -82,8 +109,10 @@ This will test a few of the available tools and display the results.
 2. Install dependencies with `npm install` or `pnpm install`
 3. Start a local Redis instance
 4. Set the `REDIS_URL` environment variable
-5. Run `npm run dev` to start the development server
-6. Test with `npm run test-client -- http://localhost:3000`
+5. For authentication, set up `.env.local` with Google OAuth credentials
+6. For Privy integration, add Privy credentials to `.env.local`
+7. Run `npm run dev` to start the development server
+8. Test with `npm run test-client -- http://localhost:3000`
 
 ## How to use the server with Cursor
 
@@ -107,3 +136,40 @@ Paste the following in the `mcp.json` file:
   }
 }
 ```
+
+## How to use with Claude Desktop
+
+Claude Desktop requires a special setup since it doesn't natively support SSE-based MCP servers. We use the `mcp-remote` package as a bridge.
+
+1. **Enable Developer Settings in Claude Desktop**
+
+   - Open Claude Desktop
+   - Go to Settings
+   - Enable Developer options
+
+2. **Edit Claude Desktop Configuration**
+   Locate and edit the Claude Desktop configuration file:
+
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+   Add the following configuration:
+
+   ```json
+   {
+     "mcpServers": {
+       "nadcp-dot-fun": {
+         "command": "npx",
+         "args": [
+           "-y",
+           "mcp-remote@latest",
+           "https://nadcp-dot-fun.vercel.app/sse"
+         ]
+       }
+     }
+   }
+   ```
+
+3. **Restart Claude Desktop**
+
+For detailed instructions and troubleshooting, see [CLAUDE_DESKTOP_SETUP.md](CLAUDE_DESKTOP_SETUP.md).
