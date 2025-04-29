@@ -13,6 +13,10 @@ import {
   accountPositionsSchema,
   getAccountCreatedTokens,
   accountCreatedTokensSchema,
+  getMonBalance,
+  getMonBalanceSchema,
+  transferMon,
+  transferMonSchema,
 } from './tools/accountInfo.js'
 
 // Import token listing tools
@@ -36,6 +40,28 @@ import {
   getTokenHolders,
   tokenHoldersSchema,
 } from './tools/tokenDetails.js'
+
+// Import market info tools
+import {
+  getMarketTypeInfoTool,
+  marketTypeInfoSchema,
+  getMarketTypeComparisonTool,
+  marketTypeComparisonSchema,
+  getTokenMarketPhaseTool,
+  tokenMarketPhaseSchema,
+} from './tools/marketInfo.js'
+
+// Import token trading tools
+import {
+  buyTokensFromCurve,
+  buyFromCurveSchema,
+  exactOutBuyTokensFromCurve,
+  exactOutBuyFromCurveSchema,
+  buyTokensFromDex,
+  buyFromDexSchema,
+  sellTokensToDex,
+  sellToDexSchema,
+} from './tools/tokenTrading.js'
 
 import { monadTestnet } from 'viem/chains'
 
@@ -91,6 +117,21 @@ async function main() {
     async (params) => getAccountCreatedTokens(publicClient, params),
   )
 
+  // Add MON balance checking and transfer tools
+  server.tool(
+    'get-mon-balance',
+    'Get MON balance for an Monad address',
+    getMonBalanceSchema,
+    async (params) => getMonBalance(publicClient, params),
+  )
+
+  server.tool(
+    'transfer-mon',
+    'Transfer MON to an Monad address',
+    transferMonSchema,
+    async (params) => transferMon(publicClient, params),
+  )
+
   // Token listing tools
   server.tool(
     'list-tokens-by-creation-time',
@@ -140,6 +181,57 @@ async function main() {
     'Get list of holders for a specific token',
     tokenHoldersSchema,
     async (params) => getTokenHolders(publicClient, params),
+  )
+
+  // Market info tools
+  server.tool(
+    'market-type-info',
+    'Get detailed information about a specific market type (CURVE or DEX)',
+    marketTypeInfoSchema,
+    async (params) => getMarketTypeInfoTool(publicClient, params),
+  )
+
+  server.tool(
+    'market-type-comparison',
+    'Get a comparison between CURVE and DEX market types',
+    marketTypeComparisonSchema,
+    async (params) => getMarketTypeComparisonTool(publicClient, params),
+  )
+
+  server.tool(
+    'token-market-phase',
+    "Get detailed information about a token's current market phase",
+    tokenMarketPhaseSchema,
+    async (params) => getTokenMarketPhaseTool(publicClient, params),
+  )
+
+  // Token trading tools
+  server.tool(
+    'buy-tokens-from-curve',
+    'Buy tokens from bonding curve (only available in CURVE phase). ',
+    buyFromCurveSchema,
+    async (params) => buyTokensFromCurve(publicClient, params),
+  )
+
+  server.tool(
+    'exact-out-buy-tokens-from-curve',
+    'Buy exact amount of tokens from bonding curve (only available in CURVE phase). ',
+    exactOutBuyFromCurveSchema,
+    async (params) => exactOutBuyTokensFromCurve(publicClient, params),
+  )
+
+  server.tool(
+    'buy-tokens-from-dex',
+    'Buy tokens from DEX (only available in DEX phase). ',
+    buyFromDexSchema,
+    async (params) => buyTokensFromDex(publicClient, params),
+  )
+
+  server.tool(
+    'sell-tokens-to-dex',
+    'Sell tokens to DEX (only available in DEX phase). ',
+    sellToDexSchema,
+    async (params) => sellTokensToDex(publicClient, params),
   )
 
   // Create a transport layer using standard input/output

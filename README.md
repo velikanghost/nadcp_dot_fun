@@ -32,7 +32,37 @@ pnpm install
 pnpm build
 ```
 
-This will start the server using the standard input/output transport layer, allowing AI assistants to interact with it.
+This server uses the standard input/output (stdio) transport layer for communication with AI assistants. For the server-sent events (SSE) version, please see [Nad.fun MCP SSE Server](https://github.com/example/nadfun-mcp-sse).
+
+### Setting up with Claude Desktop
+
+To use this MCP server with Claude Desktop:
+
+1. Build the server using `pnpm build`
+2. Create or edit the `claude_desktop_config.json` file:
+
+   - On macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - On Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+   - On Linux: `~/.config/Claude/claude_desktop_config.json`
+
+3. Add the following configuration to the file:
+
+```json
+{
+  "mcpServers": {
+    "nadcp-dot-fun": {
+      "command": "node",
+      "args": ["/full/path/to/nadcp_dot_fun/build/index.js"]
+    }
+  }
+}
+```
+
+Replace `/full/path/to/nadcp_dot_fun` with the absolute path to where you installed this repository.
+
+4. Restart Claude Desktop to load the new MCP server configuration.
+
+5. In Claude Desktop, you can now use the Nad.fun MCP server functionality.
 
 ## Tools
 
