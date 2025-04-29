@@ -1,10 +1,130 @@
-<h1>Monad SSE-based MCP using Next.js</h1>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nad.cp Monad MCP</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      h1,
+      h2,
+      h3 {
+        color: #2563eb;
+      }
+      pre {
+        background-color: #f1f5f9;
+        border-radius: 6px;
+        padding: 16px;
+        overflow-x: auto;
+      }
+      code {
+        font-family: Monaco, Consolas, 'Courier New', monospace;
+      }
+      a {
+        color: #2563eb;
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Monad SSE-based MCP using Next.js</h1>
 
-<p>Protocol is mounted below /.</p>
+    <p>Protocol is mounted below <code>/</code>.</p>
 
-<p>
-  <a
-    href="https://github.com/monad-developers/monad-sse-mcp"
-    >Check out the repo</a
-  >
-</p>
+    <p>
+      <a href="https://github.com/velikanghost/nadcp_dot_fun"
+        >View the GitHub repository</a
+      >
+    </p>
+
+    <h2>Connecting to this MCP Server</h2>
+
+    <p>
+      This is an SSE-based MCP server that can be accessed in different ways
+      depending on your client.
+    </p>
+
+    <h3>Using with Cursor (Native SSE Support)</h3>
+
+    <p>Go to <code>Cursor > Settings > Cursor Settings > MCP</code></p>
+
+    <p>Paste the following in the <code>mcp.json</code> file:</p>
+
+    <pre><code>{
+  "mcpServers": {
+    "nadcp-dot-fun": {
+      "url": "https://nadcp-dot-fun.vercel.app/sse"
+    }
+  }
+}</code></pre>
+
+    <h3>Using with Windsurf (Native SSE Support)</h3>
+
+    <p>Go to <code>Windsurf > Windsurf Settings > MCP Servers</code></p>
+
+    <p>Paste the following in the <code>mcp_config.json</code> file:</p>
+
+    <pre><code>{
+  "mcpServers": {
+    "nadcp-dot-fun": {
+      "serverUrl": "https://nadcp-dot-fun.vercel.app/sse"
+    }
+  }
+}</code></pre>
+
+    <h3>Using with Claude Desktop, Windsurf, and other stdio-only clients</h3>
+
+    <p>
+      Some clients only support stdio-based MCP servers. You can connect to this
+      SSE-based server using the <code>mcp-remote</code> bridge:
+    </p>
+
+    <h4>Claude Desktop Setup</h4>
+
+    <p>Create or edit the <code>claude_desktop_config.json</code> file:</p>
+
+    <ul>
+      <li>
+        On macOS:
+        <code
+          >~/Library/Application Support/Claude/claude_desktop_config.json</code
+        >
+      </li>
+      <li>
+        On Windows: <code>%APPDATA%\Claude\claude_desktop_config.json</code>
+      </li>
+      <li>
+        On Linux: <code>~/.config/Claude/claude_desktop_config.json</code>
+      </li>
+    </ul>
+
+    <p>Add the following configuration:</p>
+
+    <pre><code>{
+  "mcpServers": {
+    "nadcp-dot-fun": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://nadcp-dot-fun.vercel.app/sse"]
+    }
+  }
+}</code></pre>
+
+    <h4>Windsurf and Other stdio-only Clients</h4>
+
+    <p>
+      Use the same configuration format as above, adjusting the path according
+      to your client's configuration file location.
+    </p>
+  </body>
+</html>
