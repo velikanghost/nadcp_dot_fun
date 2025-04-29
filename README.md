@@ -2,6 +2,23 @@
 
 A Model Context Protocol (MCP) server for interacting with the Nad.fun platform on the Monad blockchain.
 
+This server uses the standard input/output (stdio) transport layer for communication with AI assistants. For the server-sent events (SSE) version, please see [Nad.fun MCP SSE Server](https://github.com/velikanghost/nadcp_dot_fun).
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Setting up with Windsurf](#setting-up-with-windsurf)
+  - [Setting up with Claude Desktop](#setting-up-with-claude-desktop)
+- [Tools](#tools)
+  - [Token Search and Information](#token-search-and-information)
+  - [Account Related Tools](#account-related-tools)
+  - [Token Listing Tools](#token-listing-tools)
+  - [Token Details Tools](#token-details-tools)
+- [API Integration](#api-integration)
+- [License](#license)
+
 ## Features
 
 This MCP server provides tools for:
@@ -11,15 +28,15 @@ This MCP server provides tools for:
 - Retrieving account positions and created tokens
 - Listing tokens by various criteria (creation time, market cap, latest trade)
 - Fetching token market data, chart information, swap history, and holder lists
-
-All data is fetched directly from the Nad.fun API in real-time, with no mock data.
+- Trading tokens during bonding curve and after
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nad-fun-mcp.git
+git clone https://github.com/velikanghost/nadcp_dot_fun.git
 cd nadcp_dot_fun
+git checkout stdio
 
 # Install dependencies
 pnpm install
@@ -31,8 +48,6 @@ pnpm install
 # Build the project
 pnpm build
 ```
-
-This server uses the standard input/output (stdio) transport layer for communication with AI assistants. For the server-sent events (SSE) version, please see [Nad.fun MCP SSE Server](https://github.com/example/nadfun-mcp-sse).
 
 ### Setting up with Windsurf
 
@@ -93,6 +108,12 @@ To use this MCP server with Claude Desktop:
 ```
 
 Replace `/full/path/to/nadcp_dot_fun` with the absolute path to where you installed this repository.
+
+You can get the path by running
+
+```bash
+pwd
+```
 
 4. Restart Claude Desktop to load the new MCP server configuration.
 
