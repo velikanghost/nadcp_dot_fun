@@ -19,7 +19,7 @@ All data is fetched directly from the Nad.fun API in real-time, with no mock dat
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/nad-fun-mcp.git
-cd nad-fun-mcp
+cd nadcp_dot_fun
 
 # Install dependencies
 pnpm install
@@ -33,6 +33,40 @@ pnpm build
 ```
 
 This server uses the standard input/output (stdio) transport layer for communication with AI assistants. For the server-sent events (SSE) version, please see [Nad.fun MCP SSE Server](https://github.com/example/nadfun-mcp-sse).
+
+### Setting up with Windsurf
+
+To use this MCP server with Windsurf:
+
+1. Build the server using `pnpm build`
+2. Create or edit the `mcp_config.json` file:
+
+   - `~/.codeium/windsurf/mcp_config.json`
+
+3. Add the following configuration to the file:
+
+```json
+{
+  "mcpServers": {
+    "nadcp-dot-fun": {
+      "command": "npx",
+      "args": ["-y", "/full/path/to/nadcp_dot_fun/build/index.js"]
+    }
+  }
+}
+```
+
+Replace `/full/path/to/nadcp_dot_fun` with the absolute path to where you installed this repository.
+
+You can get the path by running
+
+```bash
+pwd
+```
+
+4. Refresh MCPs list to load the new MCP server configuration.
+
+5. You can now use the Nad.fun MCP server functionality.
 
 ### Setting up with Claude Desktop
 

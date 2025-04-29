@@ -9,8 +9,8 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { parseEther } from 'viem/utils'
 import { monadTestnet } from 'viem/chains'
 import * as dotenv from 'dotenv'
-// Import official contract ABIs
-import * as NadFunAbi from 'contract-abi'
+// Import local ABIs
+import * as NadFunAbi from './abi'
 
 // Load environment variables
 dotenv.config()
@@ -37,7 +37,12 @@ export const BLOCKCHAIN_CONFIG = {
 export function createWalletClientFromPrivateKey(
   privateKey: string,
 ): WalletClient {
-  const account = privateKeyToAccount(privateKey as `0x${string}`)
+  // Add '0x' prefix if it's missing
+  const normalizedPrivateKey = privateKey.startsWith('0x')
+    ? privateKey
+    : `0x${privateKey}`
+
+  const account = privateKeyToAccount(normalizedPrivateKey as `0x${string}`)
 
   return createWalletClient({
     account,
