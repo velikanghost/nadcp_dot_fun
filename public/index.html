@@ -16,7 +16,8 @@
       }
       h1,
       h2,
-      h3 {
+      h3,
+      h4 {
         color: #2563eb;
       }
       pre {
@@ -24,6 +25,7 @@
         border-radius: 6px;
         padding: 16px;
         overflow-x: auto;
+        margin: 16px 0;
       }
       code {
         font-family: Monaco, Consolas, 'Courier New', monospace;
@@ -34,6 +36,15 @@
       }
       a:hover {
         text-decoration: underline;
+      }
+      .code-block {
+        background-color: #f1f5f9;
+        border-radius: 6px;
+        padding: 16px;
+        overflow-x: auto;
+        white-space: pre;
+        font-family: Monaco, Consolas, 'Courier New', monospace;
+        margin: 16px 0;
       }
     </style>
   </head>
@@ -61,13 +72,10 @@
 
     <p>Paste the following in the <code>mcp.json</code> file:</p>
 
-    <pre><code>{
-  "mcpServers": {
-    "nadcp-dot-fun": {
-      "url": "https://nadcp-dot-fun.vercel.app/sse"
-    }
-  }
-}</code></pre>
+    <div class="code-block">
+      { "mcpServers": { "nadcp-dot-fun": { "url":
+      "https://nadcp-dot-fun.vercel.app/sse" } } }
+    </div>
 
     <h3>Using with Windsurf (Native SSE Support)</h3>
 
@@ -75,13 +83,10 @@
 
     <p>Paste the following in the <code>mcp_config.json</code> file:</p>
 
-    <pre><code>{
-  "mcpServers": {
-    "nadcp-dot-fun": {
-      "serverUrl": "https://nadcp-dot-fun.vercel.app/sse"
-    }
-  }
-}</code></pre>
+    <div class="code-block">
+      { "mcpServers": { "nadcp-dot-fun": { "serverUrl":
+      "https://nadcp-dot-fun.vercel.app/sse" } } }
+    </div>
 
     <h3>Using with Claude Desktop, Windsurf, and other stdio-only clients</h3>
 
@@ -111,14 +116,10 @@
 
     <p>Add the following configuration:</p>
 
-    <pre><code>{
-  "mcpServers": {
-    "nadcp-dot-fun": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://nadcp-dot-fun.vercel.app/sse"]
-    }
-  }
-}</code></pre>
+    <div class="code-block">
+      { "mcpServers": { "nadcp-dot-fun": { "command": "npx", "args": ["-y",
+      "mcp-remote", "https://nadcp-dot-fun.vercel.app/sse"] } } }
+    </div>
 
     <h4>Windsurf and Other stdio-only Clients</h4>
 

@@ -24,8 +24,6 @@ This server uses the sse transport layer for communication with AI assistants. F
 - Implements the MCP protocol via Server-Sent Events
 - Provides tools for interacting with Nad.fun on Monad blockchain
 - Supports token searching, market information, token trading, and more
-- Easy to deploy on Vercel with Redis
-- Wallet integration for token transactions
 
 ## Available Tools
 
