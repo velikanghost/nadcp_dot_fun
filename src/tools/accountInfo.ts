@@ -59,15 +59,18 @@ export const getWalletBalance = async (
   }
 }
 
-//Interface for transfer parameters
-export interface TransferParams {
-  privateKey: string
-  accountAddress: string
-  amount: string
+// Schema for balance checking
+export const getMonBalanceSchema = {
+  accountAddress: z.string().describe('Account EOA address'),
 }
 
-// Schema for transfer MON
-export const transferMONSchema = {
+// Interface for balance parameters
+export interface MonBalanceParams {
+  accountAddress: string
+}
+
+// Schema for MON transfer
+export const transferMonSchema = {
   privateKey: z
     .string()
     .describe('Private key of the sender (will not be stored)'),
@@ -75,56 +78,11 @@ export const transferMONSchema = {
   amount: z.string().describe('Amount of MON to transfer'),
 }
 
-//Implementation of transfer tool
-export const transferMON = async (
-  client: PublicClient,
-  { privateKey, accountAddress, amount }: TransferParams,
-) => {
-  try {
-    // Import the actual transfer implementation function
-    const { transfer, createWalletClientFromPrivateKey } = await import(
-      '../api/nadfunRpc'
-    )
-
-    // Get sender address from private key
-    const walletClient = createWalletClientFromPrivateKey(privateKey)
-    const senderAddress = walletClient.account?.address as `0x${string}`
-
-    // Get balance before transfer
-    const balanceBefore = await client.getBalance({ address: senderAddress })
-
-    // Execute the transfer
-    const txHash = await transfer(privateKey, accountAddress, amount)
-
-    // Get balance after transfer
-    const balanceAfter = await client.getBalance({ address: senderAddress })
-
-    // Calculate the difference including gas fees
-    const totalCost = balanceBefore - balanceAfter
-    const gasUsed = totalCost - parseEther(amount)
-
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: `Successfully transferred ${amount} MON to ${accountAddress}\n\nTransaction Hash: ${txHash}\nRemaining Balance: ${formatEther(
-            balanceAfter,
-          )} MON\nGas Used: ${formatEther(gasUsed)} MON`,
-        },
-      ],
-    }
-  } catch (error) {
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: `Error transferring MON: ${
-            error instanceof Error ? error.message : 'Unknown error'
-          }`,
-        },
-      ],
-    }
-  }
+// Interface for MON transfer parameters
+export interface TransferMonParams {
+  privateKey: string
+  accountAddress: string
+  amount: string
 }
 
 // Implementation of account positions tool
@@ -283,6 +241,131 @@ export const getAccountCreatedTokens = async (
           text: `Error fetching created tokens: ${
             error instanceof Error ? error.message : 'Unknown error'
           }. Please try again later.`,
+        },
+      ],
+    }
+  }
+}
+
+// Implementation of MON balance check tool
+export const getMonBalance = async (
+  client: PublicClient,
+  { accountAddress }: MonBalanceParams,
+) => {
+  try {
+    const balance = await client.getBalance({
+      address: accountAddress as `0x${string}`,
+    })
+
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Account ${accountAddress} has a balance of ${formatEther(
+            balance,
+          )} MON`,
+        },
+      ],
+    }
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error checking MON balance: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+        },
+      ],
+    }
+  }
+}
+
+// Implementation of MON transfer tool
+export const transferMon = async (
+  client: PublicClient,
+  { privateKey, accountAddress, amount }: TransferMonParams,
+) => {
+  try {
+    // Validate the private key format
+    if (!privateKey || !privateKey.startsWith('0x')) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid private key format. Private key must start with '0x'.`,
+          },
+        ],
+      }
+    }
+
+    // Validate amount to ensure it's a proper number
+    const numAmount = parseFloat(amount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid amount: ${amount}. Please provide a positive number.`,
+          },
+        ],
+      }
+    }
+
+    // Import the transfer function
+    const { transfer, createWalletClientFromPrivateKey } = await import(
+      '../api/nadfunRpc'
+    )
+
+    // Get sender address from private key
+    const walletClient = createWalletClientFromPrivateKey(privateKey)
+    const senderAddress = walletClient.account?.address as `0x${string}`
+
+    // Check sender's balance
+    const balance = await client.getBalance({
+      address: senderAddress,
+    })
+
+    const amountInWei = parseEther(amount)
+    if (balance < amountInWei) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Insufficient balance. You have ${formatEther(
+              balance,
+            )} MON but trying to send ${amount} MON.`,
+          },
+        ],
+      }
+    }
+
+    // Execute the transfer
+    const txHash = await transfer(privateKey, accountAddress, amount)
+
+    // Get updated balance
+    const newBalance = await client.getBalance({
+      address: senderAddress,
+    })
+
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Successfully transferred ${amount} MON to ${accountAddress}\n\nTransaction Hash: ${txHash}\nRemaining Balance: ${formatEther(
+            newBalance,
+          )} MON`,
+        },
+      ],
+    }
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Error transferring MON: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
         },
       ],
     }

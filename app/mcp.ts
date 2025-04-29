@@ -13,10 +13,10 @@ import {
   accountPositionsSchema,
   getAccountCreatedTokens,
   accountCreatedTokensSchema,
-  getWalletBalance,
-  walletBalanceSchema,
-  transferMON,
-  transferMONSchema,
+  getMonBalance,
+  getMonBalanceSchema,
+  transferMon,
+  transferMonSchema,
 } from '../src/tools/accountInfo'
 
 // Import token listing tools
@@ -77,16 +77,16 @@ export const mcpHandler = initializeMcpApiHandler(
     server.tool(
       'get-mon-balance',
       'Get MON balance for an Monad address',
-      walletBalanceSchema,
-      async (params) => getWalletBalance(publicClient, params),
+      getMonBalanceSchema,
+      async (params) => getMonBalance(publicClient, params),
     )
 
     // Add a new tool to transfer MON
     server.tool(
       'transfer-mon',
       'Transfer MON to an Monad address',
-      transferMONSchema,
-      async (params) => transferMON(publicClient, params),
+      transferMonSchema,
+      async (params) => transferMon(publicClient, params),
     )
 
     // Token search

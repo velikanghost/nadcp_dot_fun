@@ -13,6 +13,10 @@ import {
   accountPositionsSchema,
   getAccountCreatedTokens,
   accountCreatedTokensSchema,
+  getMonBalance,
+  getMonBalanceSchema,
+  transferMon,
+  transferMonSchema,
 } from './tools/accountInfo.js'
 
 // Import token listing tools
@@ -111,6 +115,21 @@ async function main() {
     'Get tokens created by a specific account',
     accountCreatedTokensSchema,
     async (params) => getAccountCreatedTokens(publicClient, params),
+  )
+
+  // Add MON balance checking and transfer tools
+  server.tool(
+    'get-mon-balance',
+    'Get MON balance for an Monad address',
+    getMonBalanceSchema,
+    async (params) => getMonBalance(publicClient, params),
+  )
+
+  server.tool(
+    'transfer-mon',
+    'Transfer MON to an Monad address',
+    transferMonSchema,
+    async (params) => transferMon(publicClient, params),
   )
 
   // Token listing tools

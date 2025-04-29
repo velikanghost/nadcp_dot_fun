@@ -9,38 +9,46 @@ import {
   getPrivateKeyFromEnv,
 } from '../api/nadfunRpc'
 import { NadfunApi } from '../api/nadfunApi'
-import promptSync from 'prompt-sync'
 
 // Schema for buying tokens from bonding curve
 export const buyFromCurveSchema = {
   tokenAddress: z.string().describe('Token contract address to buy'),
   amount: z.string().describe('Amount of MON to spend'),
+  privateKey: z
+    .string()
+    .describe('Private key of the sender (will not be stored)'),
 }
 
 // Interface for buying tokens from bonding curve parameters
 export interface BuyFromCurveParams {
   tokenAddress: string
   amount: string
-  privateKey?: string
+  privateKey: string
 }
 
 // Schema for buying exact amount of tokens from bonding curve
 export const exactOutBuyFromCurveSchema = {
   tokenAddress: z.string().describe('Token contract address to buy'),
   tokensOut: z.string().describe('Exact amount of tokens to receive'),
+  privateKey: z
+    .string()
+    .describe('Private key of the sender (will not be stored)'),
 }
 
 // Interface for buying exact amount of tokens parameters
 export interface ExactOutBuyFromCurveParams {
   tokenAddress: string
   tokensOut: string
-  privateKey?: string
+  privateKey: string
 }
 
 // Schema for buying tokens from DEX
 export const buyFromDexSchema = {
   tokenAddress: z.string().describe('Token contract address to buy'),
   amount: z.string().describe('Amount of MON to spend'),
+  privateKey: z
+    .string()
+    .describe('Private key of the sender (will not be stored)'),
   slippage: z
     .number()
     .optional()
@@ -52,14 +60,17 @@ export const buyFromDexSchema = {
 export interface BuyFromDexParams {
   tokenAddress: string
   amount: string
+  privateKey: string
   slippage?: number
-  privateKey?: string
 }
 
 // Schema for selling tokens to DEX
 export const sellToDexSchema = {
   tokenAddress: z.string().describe('Token contract address to sell'),
   amount: z.string().describe('Amount of tokens to sell'),
+  privateKey: z
+    .string()
+    .describe('Private key of the sender (will not be stored)'),
   slippage: z
     .number()
     .optional()
@@ -71,21 +82,8 @@ export const sellToDexSchema = {
 export interface SellToDexParams {
   tokenAddress: string
   amount: string
+  privateKey: string
   slippage?: number
-  privateKey?: string
-}
-
-// Helper to get private key from param, env, or prompt
-function getPrivateKeyFromParamOrPrompt(paramKey?: string): string {
-  if (paramKey) return paramKey
-  try {
-    return getPrivateKeyFromEnv()
-  } catch (e) {
-    const prompt = promptSync({ sigint: true })
-    const key = prompt('Enter your private key: ')
-    if (!key) throw new Error('Private key is required')
-    return key.trim()
-  }
 }
 
 // Implementation of buying tokens from curve tool
@@ -94,8 +92,18 @@ export const buyTokensFromCurve = async (
   { tokenAddress, amount, privateKey }: BuyFromCurveParams,
 ) => {
   try {
-    // Get private key from param, env, or prompt
-    const pk = getPrivateKeyFromParamOrPrompt(privateKey)
+    // No need to get private key from environment variables anymore
+    // Validate the private key format
+    if (!privateKey || !privateKey.startsWith('0x')) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid private key format. Private key must start with '0x'.`,
+          },
+        ],
+      }
+    }
 
     // Validate amount to ensure it's a proper number
     const numAmount = parseFloat(amount)
@@ -132,7 +140,7 @@ export const buyTokensFromCurve = async (
     const { createWalletClientFromPrivateKey } = await import(
       '../api/nadfunRpc'
     )
-    const walletClient = createWalletClientFromPrivateKey(pk)
+    const walletClient = createWalletClientFromPrivateKey(privateKey)
     const walletAddress = walletClient.account?.address
 
     // Get positions before purchase to compare later
@@ -198,7 +206,7 @@ export const buyTokensFromCurve = async (
 
     // Execute transaction with proper error handling
     try {
-      const txHash = await buyFromCore(pk, tokenAddress, amount)
+      const txHash = await buyFromCore(privateKey, tokenAddress, amount)
 
       // Wait for transaction receipt and check status
       const receipt = await client.waitForTransactionReceipt({
@@ -312,8 +320,30 @@ export const exactOutBuyTokensFromCurve = async (
   { tokenAddress, tokensOut, privateKey }: ExactOutBuyFromCurveParams,
 ) => {
   try {
-    // Get private key from param, env, or prompt
-    const pk = getPrivateKeyFromParamOrPrompt(privateKey)
+    // Validate the private key format
+    if (!privateKey || !privateKey.startsWith('0x')) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid private key format. Private key must start with '0x'.`,
+          },
+        ],
+      }
+    }
+
+    // Validate tokensOut to ensure it's a proper number
+    const numTokensOut = parseFloat(tokensOut)
+    if (isNaN(numTokensOut) || numTokensOut <= 0) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid tokens amount: ${tokensOut}. Please provide a positive number.`,
+          },
+        ],
+      }
+    }
 
     // First, verify that the token is in bonding curve phase
     const marketInfo = await NadfunApi.getTokenMarket(tokenAddress)
@@ -362,7 +392,11 @@ export const exactOutBuyTokensFromCurve = async (
       estimatedAmountIn + (estimatedAmountIn * 10n) / 1000n // Include 1% fee
 
     // Execute transaction
-    const txHash = await exactOutBuyFromCore(pk, tokenAddress, requestedTokens)
+    const txHash = await exactOutBuyFromCore(
+      privateKey,
+      tokenAddress,
+      requestedTokens,
+    )
 
     // Check if this purchase might trigger DEX listing
     let additionalInfo = ''
@@ -397,11 +431,33 @@ export const exactOutBuyTokensFromCurve = async (
 // Implementation of buying tokens from DEX tool
 export const buyTokensFromDex = async (
   client: PublicClient,
-  { tokenAddress, amount, slippage = 0.5, privateKey }: BuyFromDexParams,
+  { tokenAddress, amount, privateKey, slippage = 0.5 }: BuyFromDexParams,
 ) => {
   try {
-    // Get private key from param, env, or prompt
-    const pk = getPrivateKeyFromParamOrPrompt(privateKey)
+    // Validate the private key format
+    if (!privateKey || !privateKey.startsWith('0x')) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid private key format. Private key must start with '0x'.`,
+          },
+        ],
+      }
+    }
+
+    // Validate amount to ensure it's a proper number
+    const numAmount = parseFloat(amount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid amount: ${amount}. Please provide a positive number.`,
+          },
+        ],
+      }
+    }
 
     // Check if the token is in DEX phase
     const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
@@ -421,7 +477,7 @@ export const buyTokensFromDex = async (
     const { createWalletClientFromPrivateKey } = await import(
       '../api/nadfunRpc'
     )
-    const walletClient = createWalletClientFromPrivateKey(pk)
+    const walletClient = createWalletClientFromPrivateKey(privateKey)
     const walletAddress = walletClient.account?.address
 
     // Get positions before purchase to compare later
@@ -447,7 +503,7 @@ export const buyTokensFromDex = async (
     }
 
     // Execute transaction
-    const txHash = await buyFromDex(pk, tokenAddress, amount, slippage)
+    const txHash = await buyFromDex(privateKey, tokenAddress, amount, slippage)
 
     // Wait for transaction receipt and check status
     const receipt = await client.waitForTransactionReceipt({
@@ -522,11 +578,33 @@ export const buyTokensFromDex = async (
 // Implementation of selling tokens to DEX tool
 export const sellTokensToDex = async (
   client: PublicClient,
-  { tokenAddress, amount, slippage = 0.5, privateKey }: SellToDexParams,
+  { tokenAddress, amount, privateKey, slippage = 0.5 }: SellToDexParams,
 ) => {
   try {
-    // Get private key from param, env, or prompt
-    const pk = getPrivateKeyFromParamOrPrompt(privateKey)
+    // Validate the private key format
+    if (!privateKey || !privateKey.startsWith('0x')) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid private key format. Private key must start with '0x'.`,
+          },
+        ],
+      }
+    }
+
+    // Validate amount to ensure it's a proper number
+    const numAmount = parseFloat(amount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid amount: ${amount}. Please provide a positive number.`,
+          },
+        ],
+      }
+    }
 
     // Check if the token is in DEX phase
     const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
@@ -543,7 +621,7 @@ export const sellTokensToDex = async (
     }
 
     // Execute transaction
-    const txHash = await sellToDex(pk, tokenAddress, amount, slippage)
+    const txHash = await sellToDex(privateKey, tokenAddress, amount, slippage)
 
     // Convert amount to standard units for display
     const amountStandard = parseFloat(amount).toFixed(5)
