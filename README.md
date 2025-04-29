@@ -2,6 +2,23 @@
 
 This project provides a Model Context Protocol (MCP) server for interacting with the Nad.fun platform on the Monad blockchain, built using Next.js and Server-Sent Events (SSE).
 
+This server uses the sse transport layer for communication with AI assistants. For the stdio version, please see [stdio-based Nad.fun MCP Server](https://github.com/velikanghost/nadcp_dot_fun/tree/stdio).
+
+## Table of Contents
+
+- [Features](#features)
+- [Available Tools](#available-tools)
+  - [Wallet Operations](#wallet-operations)
+  - [Token Search and Information](#token-search-and-information)
+  - [Account Information](#account-information)
+  - [Token Listings](#token-listings)
+  - [Token Details](#token-details)
+  - [Market Information](#market-information)
+  - [Token Trading](#token-trading)
+- [Connecting to this MCP Server](#connecting-to-this-mcp-server)
+  - [Using with Cursor](#using-with-cursor-native-sse-support)
+  - [Using with Claude Desktop and stdio-only clients](#using-with-claude-desktop-windsurf-and-other-stdio-only-clients)
+
 ## Features
 
 - Implements the MCP protocol via Server-Sent Events
@@ -55,41 +72,13 @@ The server provides the following Nad.fun tools:
 - `buy-tokens-from-dex`: Buy tokens from DEX
 - `sell-tokens-to-dex`: Sell tokens to DEX
 
-## How to add new tools
+## Connecting to this MCP Server
 
-Update `app/mcp.ts` with your tools, prompts, and resources following the [MCP TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
+This is an SSE-based MCP server that can be accessed in different ways depending on your client.
 
-## Notes for running on Vercel
-
-- Requires a Redis attached to the project under `process.env.REDIS_URL`
-- Make sure you have [Fluid compute](https://vercel.com/docs/functions/fluid-compute) enabled for efficient execution
-- After enabling Fluid compute, open `app/sse/route.ts` and adjust max duration to 800 if you are using a Vercel Pro or Enterprise account
-- [Deploy the Next.js MCP template](https://vercel.com/templates/next.js/model-context-protocol-mcp-with-next-js)
-
-## Sample Client
-
-`scripts/test-client.mjs` contains a sample client to try tool invocations:
-
-```sh
-npm run test-client -- http://localhost:3000
-```
-
-This will test a few of the available tools and display the results.
-
-## Running locally
-
-1. Clone the repository
-2. Install dependencies with `npm install` or `pnpm install`
-3. Start a local Redis instance
-4. Set the `REDIS_URL` environment variable
-5. Run `npm run dev` to start the development server
-6. Test with `npm run test-client -- http://localhost:3000`
-
-## How to use the server with Cursor
+### Using with Cursor (Native SSE Support)
 
 Go to `Cursor > Settings > Cursor Settings > MCP`
-
-![add_mcp](/static/add_mcp.png)
 
 Paste the following in the `mcp.json` file:
 
@@ -97,13 +86,53 @@ Paste the following in the `mcp.json` file:
 {
   "mcpServers": {
     "nadcp-dot-fun": {
-      "url": "[your_app_vercel_url]/sse",
-      "env": {
-        "PRIVATE_KEY": "",
-        "ALCHEMY_API_KEY": "",
-        "REDIS_URL": "redis://localhost:6379"
-      }
+      "url": "https://nadcp-dot-fun.vercel.app/sse"
     }
   }
 }
 ```
+
+### Using with Windsurf (Native SSE Support)
+
+Go to `Windsurf > Windsurf Settings > MCP Servers`
+
+Paste the following in the `mcp_config.json` file:
+
+```json
+{
+  "mcpServers": {
+    "nadcp-dot-fun": {
+      "serverUrl": "https://nadcp-dot-fun.vercel.app/sse"
+    }
+  }
+}
+```
+
+### Using with Claude Desktop, Windsurf, and other stdio-only clients
+
+Some clients only support stdio-based MCP servers. You can connect to this SSE-based server using the `mcp-remote` bridge:
+
+#### Claude Desktop Setup
+
+Create or edit the `claude_desktop_config.json` file:
+
+- On macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- On Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- On Linux: `~/.config/Claude/claude_desktop_config.json`
+
+Add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "nadcp-dot-fun": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://nadcp-dot-fun.vercel.app/sse"]
+    }
+  }
+}
+```
+
+#### Windsurf and Other stdio-only Clients
+
+Use the same configuration format as above, adjusting the path according to your client's configuration file location.
