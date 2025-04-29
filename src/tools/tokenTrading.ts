@@ -9,6 +9,7 @@ import {
   getPrivateKeyFromEnv,
 } from '../api/nadfunRpc'
 import { NadfunApi } from '../api/nadfunApi'
+import promptSync from 'prompt-sync'
 
 // Schema for buying tokens from bonding curve
 export const buyFromCurveSchema = {
@@ -20,6 +21,7 @@ export const buyFromCurveSchema = {
 export interface BuyFromCurveParams {
   tokenAddress: string
   amount: string
+  privateKey?: string
 }
 
 // Schema for buying exact amount of tokens from bonding curve
@@ -32,6 +34,7 @@ export const exactOutBuyFromCurveSchema = {
 export interface ExactOutBuyFromCurveParams {
   tokenAddress: string
   tokensOut: string
+  privateKey?: string
 }
 
 // Schema for buying tokens from DEX
@@ -50,6 +53,7 @@ export interface BuyFromDexParams {
   tokenAddress: string
   amount: string
   slippage?: number
+  privateKey?: string
 }
 
 // Schema for selling tokens to DEX
@@ -68,16 +72,30 @@ export interface SellToDexParams {
   tokenAddress: string
   amount: string
   slippage?: number
+  privateKey?: string
+}
+
+// Helper to get private key from param, env, or prompt
+function getPrivateKeyFromParamOrPrompt(paramKey?: string): string {
+  if (paramKey) return paramKey
+  try {
+    return getPrivateKeyFromEnv()
+  } catch (e) {
+    const prompt = promptSync({ sigint: true })
+    const key = prompt('Enter your private key: ')
+    if (!key) throw new Error('Private key is required')
+    return key.trim()
+  }
 }
 
 // Implementation of buying tokens from curve tool
 export const buyTokensFromCurve = async (
   client: PublicClient,
-  { tokenAddress, amount }: BuyFromCurveParams,
+  { tokenAddress, amount, privateKey }: BuyFromCurveParams,
 ) => {
   try {
-    // Get private key from environment variables
-    const privateKey = getPrivateKeyFromEnv()
+    // Get private key from param, env, or prompt
+    const pk = getPrivateKeyFromParamOrPrompt(privateKey)
 
     // Validate amount to ensure it's a proper number
     const numAmount = parseFloat(amount)
@@ -114,7 +132,7 @@ export const buyTokensFromCurve = async (
     const { createWalletClientFromPrivateKey } = await import(
       '../api/nadfunRpc'
     )
-    const walletClient = createWalletClientFromPrivateKey(privateKey)
+    const walletClient = createWalletClientFromPrivateKey(pk)
     const walletAddress = walletClient.account?.address
 
     // Get positions before purchase to compare later
@@ -180,7 +198,7 @@ export const buyTokensFromCurve = async (
 
     // Execute transaction with proper error handling
     try {
-      const txHash = await buyFromCore(privateKey, tokenAddress, amount)
+      const txHash = await buyFromCore(pk, tokenAddress, amount)
 
       // Wait for transaction receipt and check status
       const receipt = await client.waitForTransactionReceipt({
@@ -291,11 +309,11 @@ export const buyTokensFromCurve = async (
 // Implementation of buying exact amount of tokens from curve tool
 export const exactOutBuyTokensFromCurve = async (
   client: PublicClient,
-  { tokenAddress, tokensOut }: ExactOutBuyFromCurveParams,
+  { tokenAddress, tokensOut, privateKey }: ExactOutBuyFromCurveParams,
 ) => {
   try {
-    // Get private key from environment variables
-    const privateKey = getPrivateKeyFromEnv()
+    // Get private key from param, env, or prompt
+    const pk = getPrivateKeyFromParamOrPrompt(privateKey)
 
     // First, verify that the token is in bonding curve phase
     const marketInfo = await NadfunApi.getTokenMarket(tokenAddress)
@@ -344,11 +362,7 @@ export const exactOutBuyTokensFromCurve = async (
       estimatedAmountIn + (estimatedAmountIn * 10n) / 1000n // Include 1% fee
 
     // Execute transaction
-    const txHash = await exactOutBuyFromCore(
-      privateKey,
-      tokenAddress,
-      requestedTokens,
-    )
+    const txHash = await exactOutBuyFromCore(pk, tokenAddress, requestedTokens)
 
     // Check if this purchase might trigger DEX listing
     let additionalInfo = ''
@@ -383,11 +397,11 @@ export const exactOutBuyTokensFromCurve = async (
 // Implementation of buying tokens from DEX tool
 export const buyTokensFromDex = async (
   client: PublicClient,
-  { tokenAddress, amount, slippage = 0.5 }: BuyFromDexParams,
+  { tokenAddress, amount, slippage = 0.5, privateKey }: BuyFromDexParams,
 ) => {
   try {
-    // Get private key from environment variables
-    const privateKey = getPrivateKeyFromEnv()
+    // Get private key from param, env, or prompt
+    const pk = getPrivateKeyFromParamOrPrompt(privateKey)
 
     // Check if the token is in DEX phase
     const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
@@ -407,7 +421,7 @@ export const buyTokensFromDex = async (
     const { createWalletClientFromPrivateKey } = await import(
       '../api/nadfunRpc'
     )
-    const walletClient = createWalletClientFromPrivateKey(privateKey)
+    const walletClient = createWalletClientFromPrivateKey(pk)
     const walletAddress = walletClient.account?.address
 
     // Get positions before purchase to compare later
@@ -433,7 +447,7 @@ export const buyTokensFromDex = async (
     }
 
     // Execute transaction
-    const txHash = await buyFromDex(privateKey, tokenAddress, amount, slippage)
+    const txHash = await buyFromDex(pk, tokenAddress, amount, slippage)
 
     // Wait for transaction receipt and check status
     const receipt = await client.waitForTransactionReceipt({
@@ -508,11 +522,11 @@ export const buyTokensFromDex = async (
 // Implementation of selling tokens to DEX tool
 export const sellTokensToDex = async (
   client: PublicClient,
-  { tokenAddress, amount, slippage = 0.5 }: SellToDexParams,
+  { tokenAddress, amount, slippage = 0.5, privateKey }: SellToDexParams,
 ) => {
   try {
-    // Get private key from environment variables
-    const privateKey = getPrivateKeyFromEnv()
+    // Get private key from param, env, or prompt
+    const pk = getPrivateKeyFromParamOrPrompt(privateKey)
 
     // Check if the token is in DEX phase
     const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
@@ -529,7 +543,7 @@ export const sellTokensToDex = async (
     }
 
     // Execute transaction
-    const txHash = await sellToDex(privateKey, tokenAddress, amount, slippage)
+    const txHash = await sellToDex(pk, tokenAddress, amount, slippage)
 
     // Convert amount to standard units for display
     const amountStandard = parseFloat(amount).toFixed(5)
