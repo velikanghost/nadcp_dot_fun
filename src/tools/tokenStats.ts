@@ -3,7 +3,7 @@ import { PublicClient } from 'viem'
 import axios from 'axios'
 
 // Nad.fun API endpoints
-const NAD_FUN_API_BASE = 'https://testnet-api-server.nad.fun'
+const NAD_FUN_API_BASE = 'https://testnet-v3-api.nad.fun'
 const NAD_FUN_TOKEN_INFO = (tokenId: string) =>
   `${NAD_FUN_API_BASE}/token/${tokenId}`
 

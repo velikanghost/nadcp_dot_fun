@@ -104,7 +104,8 @@ export const getAccountPositions = async (
       limit,
     )
 
-    if (response.positions.length === 0) {
+    console.log(response)
+    if (response.total_count === 0) {
       return {
         content: [
           {
@@ -117,32 +118,20 @@ export const getAccountPositions = async (
 
     // Format positions as markdown
     let positionsText = `# Account Positions\n\n`
-    positionsText += `Found ${response.positions.length} ${positionType} positions for account ${accountAddress}:\n\n`
+    positionsText += `Found ${response.total_count} ${positionType} positions for account ${accountAddress}:\n\n`
 
-    response.positions.forEach((item, index) => {
-      const { token, position, market } = item
+    response.tokens.forEach((item, index) => {
+      const { token_info, balance, value } = item
 
       // Convert token amounts from wei to standard units
-      const currentAmount = parseFloat(
-        formatEther(BigInt(position.current_token_amount)),
-      ).toFixed(5)
-      const totalBoughtToken = parseFloat(
-        formatEther(BigInt(position.total_bought_token)),
-      ).toFixed(5)
+      const currentAmount = parseFloat(formatEther(BigInt(balance))).toFixed(5)
 
-      positionsText += `## ${index + 1}. ${token.name} (${token.symbol})\n`
-      positionsText += `- Token Address: ${token.token_address}\n`
-      positionsText += `- Current Amount: ${currentAmount} ${token.symbol}\n`
-      positionsText += `- Total Bought (MON): ${position.total_bought_native}\n`
-      positionsText += `- Total Bought (Token): ${totalBoughtToken} ${token.symbol}\n`
-      positionsText += `- Realized PnL (MON): ${position.realized_pnl}\n`
-      positionsText += `- Unrealized PnL (MON): ${position.unrealized_pnl}\n`
-      positionsText += `- Total PnL (MON): ${position.total_pnl}\n`
-      positionsText += `- Current Price: ${market.price} MON\n`
-      positionsText += `- Market Type: ${market.market_type}\n`
-      positionsText += `- Last Traded: ${new Date(
-        position.last_traded_at * 1000,
-      ).toLocaleString()}\n\n`
+      positionsText += `## ${index + 1}. ${token_info.name} (${
+        token_info.symbol
+      })\n`
+      positionsText += `- Token Address: ${token_info.token_id}\n`
+      positionsText += `- Current Amount: ${currentAmount} ${token_info.symbol}\n`
+      positionsText += `- Current Price: ${value} MON\n`
     })
 
     return {
@@ -198,13 +187,13 @@ export const getAccountCreatedTokens = async (
 
     response.tokens.forEach((token, index) => {
       tokensText += `## ${index + 1}. ${token.name} (${token.symbol})\n`
-      tokensText += `- Token Address: ${token.token_address}\n`
+      tokensText += `- Token Address: ${token.token_id}\n`
 
       if (token.description) {
         tokensText += `- Description: ${token.description}\n`
       }
 
-      tokensText += `- Total Supply: ${token.total_supply}\n`
+      tokensText += `- Total Supply: ${token.reserve_token}\n`
 
       if (token.price) {
         tokensText += `- Current Price: ${token.price} MON\n`

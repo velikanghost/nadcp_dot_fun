@@ -60,18 +60,19 @@ export const listTokensByCreationTime = async (
 
     // Format tokens as markdown
     let tokensText = `# Newest Tokens on Nad.fun\n\n`
-    tokensText += `Found ${response.order_token.length} tokens (ordered by creation time):\n\n`
+    tokensText += `Found ${response.total_count} tokens (ordered by creation time):\n\n`
 
     response.order_token.forEach((item, index) => {
       const tokenInfo = item.token_info
-      const marketInfo = item.market_info
+      const accountInfo = item.account_info
 
       tokensText += `## ${index + 1}. ${tokenInfo.name} (${tokenInfo.symbol})\n`
-      tokensText += `- Token Address: ${tokenInfo.token_address}\n`
-      tokensText += `- Price: ${marketInfo.price}\n`
-      tokensText += `- Creator: ${tokenInfo.creator}\n`
-      tokensText += `- Total Supply: ${tokenInfo.total_supply}\n`
-      tokensText += `- Market Type: ${marketInfo.market_type}\n`
+      tokensText += `- Token Address: ${tokenInfo.token_id}\n`
+      tokensText += `- Market Cap: ${tokenInfo.market_cap}\n`
+      tokensText += `- Creator: ${accountInfo.nickname}\n`
+      tokensText += `- Description: ${tokenInfo.description}\n`
+      tokensText += `- Total Supply: ${tokenInfo.reserve_token}\n`
+      tokensText += `- Market Type: ${tokenInfo.market_type}\n`
       tokensText += `- Created: ${new Date(
         tokenInfo.created_at * 1000,
       ).toLocaleString()}\n\n`
@@ -129,14 +130,14 @@ export const listTokensByMarketCap = async (
 
     response.order_token.forEach((item, index) => {
       const tokenInfo = item.token_info
-      const marketInfo = item.market_info
+      const accountInfo = item.account_info
 
       tokensText += `## ${index + 1}. ${tokenInfo.name} (${tokenInfo.symbol})\n`
-      tokensText += `- Token Address: ${tokenInfo.token_address}\n`
-      tokensText += `- Price: ${marketInfo.price}\n`
-      tokensText += `- Creator: ${tokenInfo.creator}\n`
-      tokensText += `- Total Supply: ${tokenInfo.total_supply}\n`
-      tokensText += `- Market Type: ${marketInfo.market_type}\n`
+      tokensText += `- Token Address: ${tokenInfo.token_id}\n`
+      tokensText += `- Market Cap: ${tokenInfo.market_cap}\n`
+      tokensText += `- Creator: ${accountInfo.nickname}\n`
+      tokensText += `- Total Supply: ${tokenInfo.reserve_token}\n`
+      tokensText += `- Market Type: ${tokenInfo.market_type}\n`
       tokensText += `- Created: ${new Date(
         tokenInfo.created_at * 1000,
       ).toLocaleString()}\n\n`
@@ -194,14 +195,15 @@ export const listTokensByLatestTrade = async (
 
     response.order_token.forEach((item, index) => {
       const tokenInfo = item.token_info
-      const marketInfo = item.market_info
+      const accountInfo = item.account_info
 
       tokensText += `## ${index + 1}. ${tokenInfo.name} (${tokenInfo.symbol})\n`
-      tokensText += `- Token Address: ${tokenInfo.token_address}\n`
-      tokensText += `- Price: ${marketInfo.price}\n`
-      tokensText += `- Creator: ${tokenInfo.creator}\n`
-      tokensText += `- Total Supply: ${tokenInfo.total_supply}\n`
-      tokensText += `- Market Type: ${marketInfo.market_type}\n`
+      tokensText += `- Token Address: ${tokenInfo.token_id}\n`
+      tokensText += `- Market Cap: ${tokenInfo.market_cap}\n`
+      tokensText += `- Creator: ${accountInfo.nickname}\n`
+      tokensText += `- Description: ${tokenInfo.description}\n`
+      tokensText += `- Total Supply: ${tokenInfo.reserve_token}\n`
+      tokensText += `- Market Type: ${tokenInfo.market_type}\n`
       tokensText += `- Created: ${new Date(
         tokenInfo.created_at * 1000,
       ).toLocaleString()}\n\n`

@@ -2,19 +2,22 @@
 
 // Token types
 export interface Token {
-  token_address: string
+  token_id: string
   name: string
   symbol: string
   image_uri: string
-  creator?: string
-  total_supply?: string
+  description: string
+  market_cap: string
+  reserve_token: string
   created_at: number
+  market_type: string
+  score: number
 }
 
 export interface TokenWithDescription extends Token {
-  description?: string
+  description: string
   is_listing?: boolean
-  market_cap?: string
+  market_cap: string
   price?: string
   current_amount?: string
 }
@@ -50,11 +53,10 @@ export interface Position {
 
 // Account Position Response
 export interface AccountPositionResponse {
-  account_address: string
-  positions: Array<{
-    token: Token
-    position: Position
-    market: Market
+  tokens: Array<{
+    balance: string
+    token_info: Token
+    value: string
   }>
   total_count: number
 }
@@ -65,21 +67,25 @@ export interface AccountCreatedTokensResponse {
   total_count: number
 }
 
+export interface AccountInfo {
+  account_id: string
+  follower_count: number
+  following_count: number
+  nickname: string
+  image_uri: string
+}
+
 // Order Token Response
 export interface OrderTokenResponse {
   order_type: string
   order_token: Array<{
-    token_info: {
-      token_address: string
-      name: string
-      symbol: string
-      image_uri: string
-      creator: string
-      total_supply: string
-      created_at: number
-    }
-    market_info: Market
+    token_info: Token
+    account_info: AccountInfo
   }>
+  king_of_the_hill: {
+    token_info: Token
+    account_info: AccountInfo
+  }
   total_count: number
 }
 

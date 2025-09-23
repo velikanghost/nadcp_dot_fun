@@ -1,10 +1,10 @@
-import { z } from 'zod'
 import { initializeMcpApiHandler } from '../lib/mcp-api-handler'
-import { createPublicClient, http, formatEther } from 'viem'
+import { createPublicClient, http } from 'viem'
 import { monadTestnet } from 'viem/chains'
+import { z } from 'zod'
 
 // Import our tool implementations
-import { searchTokens, searchTokensSchema } from '../src/tools/tokenSearch'
+import { searchTokens } from '../src/tools/tokenSearch'
 import { getTokenStats, tokenStatsSchema } from '../src/tools/tokenStats'
 
 // Import account tools
@@ -93,8 +93,10 @@ export const mcpHandler = initializeMcpApiHandler(
     server.tool(
       'search-tokens',
       'Search for tokens on Nad.fun by name or symbol',
-      searchTokensSchema,
-      async (params) => searchTokens(publicClient, params),
+      {
+        query: z.string().describe('Token name or symbol to search for'),
+      },
+      async (params) => searchTokens(publicClient, params.query),
     )
 
     server.tool(
@@ -145,7 +147,19 @@ export const mcpHandler = initializeMcpApiHandler(
     server.tool(
       'token-chart',
       'Get chart data for a specific token',
-      tokenChartSchema,
+      {
+        tokenAddress: z.string().describe('Token contract address'),
+        resolution: z.number().describe('Chart resolution'),
+        from: z.number().describe('Start timestamp'),
+        to: z.number().describe('End timestamp'),
+        countback: z.number().describe('Number of data points'),
+        baseTimestamp: z
+          .number()
+          .optional()
+          .describe(
+            'Base timestamp for the chart (current time if not provided)',
+          ),
+      },
       async (params) => getTokenChart(publicClient, params),
     )
 

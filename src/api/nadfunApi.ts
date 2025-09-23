@@ -11,7 +11,7 @@ import {
 } from './types'
 
 // Base API URL as specified in the documentation
-const BASE_URL = 'https://testnet-bot-api-server.nad.fun'
+const BASE_URL = 'https://testnet-v3-api.nad.fun'
 
 // API client for Nad.fun
 export class NadfunApi {
@@ -30,7 +30,7 @@ export class NadfunApi {
     page: number = 1,
     limit: number = 10,
   ): Promise<AccountPositionResponse> {
-    const url = `${BASE_URL}/account/position/${accountAddress}`
+    const url = `${BASE_URL}/profile/hold-token/${accountAddress}`
     const response = await axios.get<AccountPositionResponse>(url, {
       params: { position_type: positionType, page, limit },
     })
@@ -48,7 +48,7 @@ export class NadfunApi {
     page: number = 1,
     limit: number = 10,
   ): Promise<AccountCreatedTokensResponse> {
-    const url = `${BASE_URL}/account/create_token/${accountAddress}`
+    const url = `${BASE_URL}/profile/tokens/created/${accountAddress}`
     const response = await axios.get<AccountCreatedTokensResponse>(url, {
       params: { page, limit },
     })
@@ -125,12 +125,11 @@ export class NadfunApi {
    */
   static async getTokenChart(
     tokenAddress: string,
-    interval: '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w' = '1h',
     baseTimestamp: number = Math.floor(Date.now() / 1000),
   ): Promise<TokenChartResponse> {
-    const url = `${BASE_URL}/token/chart/${tokenAddress}`
+    const url = `${BASE_URL}/trade/chart/${tokenAddress}`
     const response = await axios.get<TokenChartResponse>(url, {
-      params: { interval, base_timestamp: baseTimestamp },
+      params: { resolution: 1, from: 0, to: baseTimestamp, countback: 300 },
     })
     return response.data
   }
@@ -146,9 +145,9 @@ export class NadfunApi {
     page: number = 1,
     limit: number = 10,
   ): Promise<TokenSwapResponse> {
-    const url = `${BASE_URL}/token/swap/${tokenAddress}`
+    const url = `${BASE_URL}/trade/swap-history/${tokenAddress}`
     const response = await axios.get<TokenSwapResponse>(url, {
-      params: { page, limit },
+      params: { page, limit, direction: 'DESC', trade_type: 'ALL' },
     })
     return response.data
   }
@@ -160,7 +159,7 @@ export class NadfunApi {
   static async getTokenMarket(
     tokenAddress: string,
   ): Promise<TokenMarketResponse> {
-    const url = `${BASE_URL}/token/market/${tokenAddress}`
+    const url = `${BASE_URL}/trade/market/${tokenAddress}`
     const response = await axios.get<TokenMarketResponse>(url)
     return response.data
   }
@@ -176,7 +175,7 @@ export class NadfunApi {
     page: number = 1,
     limit: number = 10,
   ): Promise<TokenHoldersResponse> {
-    const url = `${BASE_URL}/token/holder/${tokenAddress}`
+    const url = `${BASE_URL}/trade/holder/${tokenAddress}?tokenId=${tokenAddress}`
     const response = await axios.get<TokenHoldersResponse>(url, {
       params: { page, limit },
     })

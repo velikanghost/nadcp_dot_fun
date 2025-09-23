@@ -161,7 +161,7 @@ export async function exactOutBuyFromCore(
 
   // Get token market information
   const tokenMarketInfo = await fetch(
-    `https://testnet-bot-api-server.nad.fun/token/market/${tokenAddress}`,
+    `https://testnet-v3-api.nad.fun/token/market/${tokenAddress}`,
   )
   const marketData = await tokenMarketInfo.json()
 
@@ -237,7 +237,7 @@ export async function buyFromDex(
 
   // Check if token is listed
   const tokenInfo = await fetch(
-    `https://testnet-bot-api-server.nad.fun/token/${tokenAddress}`,
+    `https://testnet-v3-api.nad.fun/token/${tokenAddress}`,
   )
   const tokenData = await tokenInfo.json()
 
@@ -307,7 +307,7 @@ export async function sellToDex(
 
   // Check if token is listed
   const tokenInfo = await fetch(
-    `https://testnet-bot-api-server.nad.fun/token/${tokenAddress}`,
+    `https://testnet-v3-api.nad.fun/token/${tokenAddress}`,
   )
   const tokenData = await tokenInfo.json()
 

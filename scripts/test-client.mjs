@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import fetch from 'node-fetch'
+// import fetch from 'node-fetch'
 import { createEventSource } from './event-source.mjs'
 
 /**
@@ -44,19 +44,38 @@ async function invokeTool(toolId, params) {
 
   const eventSource = createEventSource(`${baseUrl}/sse`)
 
-  // Wait for connection
-  await new Promise((resolve) => {
+  // Wait for connection and get session ID
+  let sessionId = null
+  await new Promise((resolve, reject) => {
     eventSource.onopen = () => {
       console.log('Connected to SSE')
-      resolve()
+    }
+
+    eventSource.onmessage = (event) => {
+      console.log('Received event:', event.data)
+
+      // Extract session ID from the endpoint event
+      if (event.data && event.data.includes('sessionId=')) {
+        const match = event.data.match(/sessionId=([^&\s]+)/)
+        if (match) {
+          sessionId = match[1]
+          console.log(`Session ID: ${sessionId}`)
+          resolve()
+        }
+      }
+    }
+
+    eventSource.onerror = (error) => {
+      console.error('SSE error:', error)
+      reject(error)
     }
   })
 
-  // Get the session ID from the URL
-  const sessionId = new URL(eventSource.url).searchParams.get('sessionId')
-  console.log(`Session ID: ${sessionId}`)
+  if (!sessionId) {
+    throw new Error('Failed to get session ID from SSE connection')
+  }
 
-  // Listen for events
+  // Listen for tool results
   let result = null
 
   const resultPromise = new Promise((resolve, reject) => {
@@ -115,7 +134,7 @@ async function invokeTool(toolId, params) {
 async function main() {
   try {
     // Test the MON balance tool with a sample address
-    await testGetMonBalance('0x3bb9AFB94c82752E47706A10779EA525Cf95dc27')
+    await testGetMonBalance('0xe329ce7EcB851c09948e5F507F1a6FfA40De055B')
 
     // Run the test sequence
     const searchResults = await testTokenSearch()

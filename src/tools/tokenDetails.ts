@@ -18,7 +18,10 @@ export const tokenChartSchema = {
 // Interface for token chart parameters
 export interface TokenChartParams {
   tokenAddress: string
-  interval: '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w'
+  resolution: number
+  from: number
+  to: number
+  countback: number
   baseTimestamp?: number
 }
 
@@ -63,18 +66,14 @@ export interface TokenHoldersParams {
 // Implementation of token chart tool
 export const getTokenChart = async (
   client: PublicClient,
-  { tokenAddress, interval, baseTimestamp }: TokenChartParams,
+  { tokenAddress, baseTimestamp }: TokenChartParams,
 ) => {
   try {
     // Set default timestamp to current time if not provided
     const timestamp = baseTimestamp || Math.floor(Date.now() / 1000)
 
     // Fetch token chart data
-    const response = await NadfunApi.getTokenChart(
-      tokenAddress,
-      interval,
-      timestamp,
-    )
+    const response = await NadfunApi.getTokenChart(tokenAddress, timestamp)
 
     if (response.prices.length === 0) {
       return {
@@ -89,7 +88,6 @@ export const getTokenChart = async (
 
     // Format chart data as markdown
     let chartText = `# Price Chart for Token (${tokenAddress})\n\n`
-    chartText += `Interval: ${interval}\n`
     chartText += `Total data points: ${response.prices.length}\n\n`
 
     // Display tabular data of recent prices
