@@ -49,14 +49,75 @@
     </style>
   </head>
   <body>
-    <h1>Nad.fun SSE-based MCP using Next.js</h1>
+    <h1>Nad.fun MCP Server</h1>
 
-    <p>Protocol is mounted below <code>/</code>.</p>
+    <p>
+      This is a Model Context Protocol (MCP) server for interacting with the
+      Nad.fun platform on the Monad blockchain, built using Next.js and
+      Server-Sent Events (SSE).
+    </p>
 
     <p>
       <a href="https://github.com/velikanghost/nadcp_dot_fun"
         >View the GitHub repository</a
       >
+    </p>
+
+    <h2>Features</h2>
+    <ul>
+      <li>Implements the MCP protocol via Server-Sent Events</li>
+      <li>Provides tools for interacting with Nad.fun on Monad blockchain</li>
+      <li>
+        Supports token searching, market information, token trading, and more
+      </li>
+      <li>Updated contract integration with latest Nad.fun contracts</li>
+      <li>Smart phase detection (CURVE vs DEX)</li>
+      <li>Real-time trading with proper slippage protection</li>
+    </ul>
+
+    <h2>Available Tools</h2>
+    <p>The server provides comprehensive Nad.fun tools including:</p>
+    <ul>
+      <li>
+        <strong>Wallet Operations:</strong> MON balance checking and transfers
+      </li>
+      <li><strong>Token Search:</strong> Search tokens by name or symbol</li>
+      <li>
+        <strong>Account Information:</strong> Positions and created tokens
+      </li>
+      <li>
+        <strong>Token Listings:</strong> By creation time, market cap, and
+        latest trades
+      </li>
+      <li>
+        <strong>Token Details:</strong> Charts, swap history, market info, and
+        holders
+      </li>
+      <li>
+        <strong>Market Information:</strong> Market types and phase detection
+      </li>
+      <li>
+        <strong>Token Trading:</strong> Buy/sell on both bonding curve and DEX
+      </li>
+    </ul>
+
+    <h2>Setup Requirements</h2>
+    <p>Before using this MCP server, you need:</p>
+    <ul>
+      <li>
+        <strong>ALCHEMY_API_KEY:</strong> Your Alchemy API key for Monad testnet
+      </li>
+      <li>
+        <strong>REDIS_REMOTE_REDIS_URL:</strong> Redis connection URL (local or
+        cloud)
+      </li>
+    </ul>
+    <p>
+      See the
+      <a href="https://github.com/velikanghost/nadcp_dot_fun"
+        >GitHub repository</a
+      >
+      for detailed setup instructions.
     </p>
 
     <h2>Connecting to this MCP Server</h2>
@@ -74,7 +135,8 @@
 
     <div class="code-block">
       { "mcpServers": { "nadcp-dot-fun": { "url":
-      "https://nadcp-dot-fun.vercel.app/sse" } } }
+      "https://nadcp-dot-fun.vercel.app/sse", "env": { "PRIVATE_KEY":
+      "your_private_key" } } } }
     </div>
 
     <h3>Using with Windsurf (Native SSE Support)</h3>

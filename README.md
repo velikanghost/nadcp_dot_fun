@@ -65,10 +65,97 @@ The server provides the following Nad.fun tools:
 
 ### Token Trading
 
-- `buy-tokens-from-curve`: Buy tokens from bonding curve
-- `exact-out-buy-tokens-from-curve`: Buy exact amount of tokens from curve
-- `buy-tokens-from-dex`: Buy tokens from DEX
-- `sell-tokens-to-dex`: Sell tokens to DEX
+- `buy-tokens-from-curve`: Buy tokens from bonding curve (CURVE phase)
+- `exact-out-buy-tokens-from-curve`: Buy exact amount of tokens from bonding curve
+- `sell-tokens-to-curve`: Sell tokens to bonding curve (CURVE phase)
+- `buy-tokens-from-dex`: Buy tokens from DEX (DEX phase)
+- `sell-tokens-to-dex`: Sell tokens to DEX (DEX phase)
+
+## Technical Details
+
+### Contract Integration
+
+This MCP server uses the latest Nad.fun contracts on Monad testnet:
+
+- **BondingCurve**: `0x52D34d8536350Cd997bCBD0b9E9d722452f341F5`
+- **BondingCurveRouter**: `0x4F5A3518F082275edf59026f72B66AC2838c0414`
+- **DexRouter**: `0x4FBDC27FAE5f99E7B09590bEc8Bf20481FCf9551`
+- **Factory**: `0x961235a9020B05C44DF1026D956D1F4D78014276`
+- **WMON**: `0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701`
+
+### Trading Phases
+
+- **CURVE Phase**: Tokens are sold through bonding curve mechanism
+
+  - Use `buy-tokens-from-curve` or `sell-tokens-to-curve`
+  - Tokens cannot be transferred between wallets
+  - Price follows mathematical formula
+
+- **DEX Phase**: Tokens are traded on decentralized exchange
+  - Use `buy-tokens-from-dex` or `sell-tokens-to-dex`
+  - Tokens can be freely transferred
+  - Price determined by market supply and demand
+
+### Security Features
+
+- Private key validation and secure handling
+- Automatic slippage protection (5% for bonding curve, 0.5% for DEX)
+- Gas limit protection (300,000 gas)
+- Deadline protection (5 minutes)
+- Real-time balance checking
+
+## Setup
+
+### Environment Variables
+
+Before using this MCP server, you need to set up the following environment variables:
+
+#### Required Environment Variables
+
+1. **ALCHEMY_API_KEY**: Your Alchemy API key for Monad testnet
+
+   ```bash
+   ALCHEMY_API_KEY="your_alchemy_api_key_here"
+   ```
+
+2. **REDIS_URL**: Redis connection URL for caching and session management
+
+   **Option 1: Local Redis**
+
+   Install Redis using Homebrew:
+
+   ```bash
+   brew install redis
+   brew services start redis
+   ```
+
+   Then set the environment variable:
+
+   ```bash
+   REDIS_REMOTE_REDIS_URL="redis://localhost:6379"
+   ```
+
+   **Option 2: Remote/Cloud Redis**
+
+   Use a cloud Redis service like Redis Cloud, AWS ElastiCache, or Upstash:
+
+   ```bash
+   export REDIS_REMOTE_REDIS_URL="redis://username:password@host:port"
+   # or for Redis Cloud/Upstash
+   export REDIS_REMOTE_REDIS_URL="rediss://username:password@host:port"
+   ```
+
+### Getting Your Alchemy API Key
+
+1. Go to [Alchemy](https://www.alchemy.com/)
+2. Create an account or sign in
+3. Create a new app and select "Monad" as the chain
+4. Copy your API key from the dashboard
+
+### Redis Setup Options
+
+- **Local**: Use local Redis with Homebrew (easiest setup)
+- **Cloud**: Use a managed Redis service for better reliability
 
 ## Connecting to this MCP Server
 
@@ -84,7 +171,10 @@ Paste the following in the `mcp.json` file:
 {
   "mcpServers": {
     "nadcp-dot-fun": {
-      "url": "https://nadcp-dot-fun.vercel.app/sse"
+      "url": "https://nadcp-dot-fun.vercel.app/sse",
+      "env": {
+        "PRIVATE_KEY": your_private_key
+      }
     }
   }
 }
