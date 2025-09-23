@@ -461,6 +461,82 @@ export async function getAvailableBuyTokens(tokenAddress: string): Promise<{
 }
 
 /**
+ * Sells tokens to bonding curve using BondingCurveRouter
+ * @param privateKey - Private key of the sender
+ * @param tokenAddress - Token address to sell
+ * @param amount - Amount of tokens to sell
+ * @returns Transaction hash
+ */
+export async function sellToBondingCurve(
+  privateKey: string,
+  tokenAddress: string,
+  amount: string,
+): Promise<string> {
+  const walletClient = createWalletClientFromPrivateKey(privateKey)
+  const publicClient = createPublicRpcClient()
+
+  // Check token status using contract methods as per documentation
+  const { isListed, isLocked } = await getTokenStatus(tokenAddress)
+  if (isListed) {
+    throw new Error(
+      'Token is already listed on DEX. Use DEX functions to sell.',
+    )
+  }
+  if (isLocked) {
+    throw new Error('Token is locked. Cannot sell at this time.')
+  }
+
+  const amountIn = parseEther(amount)
+  const to = walletClient.account?.address
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300) // 5 minutes
+
+  // Get expected output amount using contract method
+  const amountOut = await publicClient.readContract({
+    address: CONTRACT_ADDRESSES.BONDING_CURVE_ROUTER as `0x${string}`,
+    abi: BondingCurveRouterAbi,
+    functionName: 'getAmountOut',
+    args: [tokenAddress as `0x${string}`, amountIn, false], // false for sell
+  })
+
+  // Set minimum output with 5% slippage
+  const amountOutMin = ((amountOut as bigint) * 95n) / 100n
+
+  // First approve tokens to BondingCurveRouter
+  const approveTxHash = await walletClient.writeContract({
+    address: tokenAddress as `0x${string}`,
+    abi: TokenAbi,
+    functionName: 'approve',
+    args: [CONTRACT_ADDRESSES.BONDING_CURVE_ROUTER as `0x${string}`, amountIn],
+    gas: 100000n,
+    chain: walletClient.chain,
+    account: walletClient.account!,
+  })
+
+  // Wait for approval confirmation
+  await publicClient.waitForTransactionReceipt({ hash: approveTxHash })
+
+  const txHash = await walletClient.writeContract({
+    address: CONTRACT_ADDRESSES.BONDING_CURVE_ROUTER as `0x${string}`,
+    abi: BondingCurveRouterAbi,
+    functionName: 'sell',
+    args: [
+      {
+        token: tokenAddress as `0x${string}`,
+        amountIn,
+        amountOutMin,
+        to,
+        deadline,
+      },
+    ],
+    gas: 300000n,
+    chain: walletClient.chain,
+    account: walletClient.account!,
+  })
+
+  return txHash
+}
+
+/**
  * Gets the private key from environment variables
  * @returns Private key from environment or throw error if not found
  */

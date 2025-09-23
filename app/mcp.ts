@@ -234,6 +234,47 @@ export const mcpHandler = initializeMcpApiHandler(
       sellToDexSchema,
       async (params) => sellTokensToDex(publicClient, params),
     )
+
+    server.tool(
+      'sell-tokens-to-curve',
+      'Sell tokens to bonding curve (available in CURVE phase)',
+      {
+        tokenAddress: z.string().describe('Token contract address to sell'),
+        amount: z.string().describe('Amount of tokens to sell'),
+        privateKey: z
+          .string()
+          .describe('Private key of the sender (will not be stored)'),
+      },
+      async (params) => {
+        const { sellToBondingCurve } = await import('../src/api/nadfunRpc')
+        try {
+          const txHash = await sellToBondingCurve(
+            params.privateKey,
+            params.tokenAddress,
+            params.amount,
+          )
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Successfully initiated sale of ${params.amount} tokens to bonding curve.\n\nTransaction hash: ${txHash}`,
+              },
+            ],
+          }
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Error selling tokens to bonding curve: ${
+                  error instanceof Error ? error.message : 'Unknown error'
+                }. Please try again later.`,
+              },
+            ],
+          }
+        }
+      },
+    )
   },
   {
     capabilities: {
