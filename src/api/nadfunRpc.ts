@@ -9,18 +9,21 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { parseEther } from 'viem/utils'
 import { monadTestnet } from 'viem/chains'
 import * as dotenv from 'dotenv'
-// Import official contract ABIs
-import * as NadFunAbi from 'contract-abi'
+// Import local contract ABIs
+import BondingCurveAbi from '../abi/IBondingCurve.json'
+import BondingCurveRouterAbi from '../abi/IBondingCurveRouter.json'
+import DexRouterAbi from '../abi/IDexRouter.json'
+import TokenAbi from '../abi/IToken.json'
 
 // Load environment variables
 dotenv.config()
 
 export const CONTRACT_ADDRESSES = {
-  CORE: '0x822EB1ADD41cf87C3F178100596cf24c9a6442f6',
-  BONDING_CURVE_FACTORY: '0x60216FB3285595F4643f9f7cddAB842E799BD642',
-  UNISWAP_V2_ROUTER: '0x619d07287e87C9c643C60882cA80d23C8ed44652',
-  UNISWAP_V2_FACTORY: '0x13eD0D5e1567684D964469cCbA8A977CDA580827',
-  WRAPPED_MON: '0x3bb9AFB94c82752E47706A10779EA525Cf95dc27',
+  BONDING_CURVE: '0x52D34d8536350Cd997bCBD0b9E9d722452f341F5',
+  BONDING_CURVE_ROUTER: '0x4F5A3518F082275edf59026f72B66AC2838c0414',
+  DEX_ROUTER: '0x4FBDC27FAE5f99E7B09590bEc8Bf20481FCf9551',
+  FACTORY: '0x961235a9020B05C44DF1026D956D1F4D78014276',
+  WRAPPED_MON: '0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701',
 }
 
 // Blockchain configuration
@@ -106,36 +109,67 @@ export function calculateRequiredAmountIn(
 }
 
 /**
- * Buys tokens from a bonding curve via Core
+ * Buys tokens from bonding curve using BondingCurveRouter
  * @param privateKey - Private key of the sender
  * @param tokenAddress - Token address to buy
  * @param amount - Amount of MON to spend
  * @returns Transaction hash
  */
-export async function buyFromCore(
+export async function buyFromBondingCurve(
   privateKey: string,
   tokenAddress: string,
   amount: string,
 ): Promise<string> {
   const walletClient = createWalletClientFromPrivateKey(privateKey)
-  const coreAbi = NadFunAbi.ICore
+  const publicClient = createPublicRpcClient()
+
+  // Check token status using contract methods as per documentation
+  const { isListed, isLocked } = await getTokenStatus(tokenAddress)
+  if (isListed) {
+    throw new Error('Token is already listed on DEX. Use DEX functions to buy.')
+  }
+  if (isLocked) {
+    throw new Error('Token is locked. Cannot buy at this time.')
+  }
+
+  // Check available tokens using contract method
+  const { availableTokens } = await getAvailableBuyTokens(tokenAddress)
+  if (availableTokens === 0n) {
+    throw new Error(
+      'No tokens available for purchase. Token may be fully sold out.',
+    )
+  }
 
   const amountIn = parseEther(amount)
-  // 1% fee
-  const fee = (amountIn * 10n) / 1000n
-  const totalValue = amountIn + fee
-
-  // 20 minutes deadline
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60)
   const to = walletClient.account?.address
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300) // 5 minutes
+
+  // Get expected output amount using contract method
+  const amountOut = await publicClient.readContract({
+    address: CONTRACT_ADDRESSES.BONDING_CURVE_ROUTER as `0x${string}`,
+    abi: BondingCurveRouterAbi,
+    functionName: 'getAmountOut',
+    args: [tokenAddress as `0x${string}`, amountIn, true],
+  })
+
+  // Set minimum output with 5% slippage
+  const amountOutMin = ((amountOut as bigint) * 95n) / 100n
 
   const txHash = await walletClient.writeContract({
-    address: CONTRACT_ADDRESSES.CORE as `0x${string}`,
-    abi: coreAbi,
+    address: CONTRACT_ADDRESSES.BONDING_CURVE_ROUTER as `0x${string}`,
+    abi: BondingCurveRouterAbi,
     functionName: 'buy',
-    args: [amountIn, fee, tokenAddress, to, deadline],
-    value: totalValue,
-    gas: 300000n, // Explicit gas limit
+    args: [
+      {
+        token: tokenAddress as `0x${string}`,
+        amountIn,
+        amountOutMin,
+        to,
+        deadline,
+      },
+    ],
+    value: amountIn,
+    gas: 300000n,
     chain: walletClient.chain,
     account: walletClient.account!,
   })
@@ -151,64 +185,52 @@ export async function buyFromCore(
  * @param tokensOut - Exact amount of tokens to receive
  * @returns Transaction hash
  */
-export async function exactOutBuyFromCore(
+export async function exactOutBuyFromBondingCurve(
   privateKey: string,
   tokenAddress: string,
   tokensOut: bigint,
 ): Promise<string> {
   const walletClient = createWalletClientFromPrivateKey(privateKey)
-  const address = walletClient.account?.address
+  const publicClient = createPublicRpcClient()
 
-  // Get token market information
-  const tokenMarketInfo = await fetch(
-    `https://testnet-v3-api.nad.fun/token/market/${tokenAddress}`,
-  )
-  const marketData = await tokenMarketInfo.json()
-
-  // Extract values from market data
-  const virtualNative = BigInt(marketData.virtual_native)
-  const virtualToken = BigInt(marketData.virtual_token)
-  const reserveToken = BigInt(marketData.reserve_token || '0')
-  const targetToken = BigInt(marketData.target_token || '0')
-
-  // Calculate available tokens
-  const availableTokens = reserveToken - targetToken
-
-  // Check if enough tokens are available
-  if (tokensOut > availableTokens) {
-    throw new Error(
-      `Requested token amount exceeds available supply. Maximum available: ${availableTokens}`,
-    )
+  // Check token status
+  const { isListed, isLocked } = await getTokenStatus(tokenAddress)
+  if (isListed) {
+    throw new Error('Token is already listed on DEX. Use DEX functions to buy.')
+  }
+  if (isLocked) {
+    throw new Error('Token is locked. Cannot buy at this time.')
   }
 
-  // Calculate constant product k
-  const k = virtualNative * virtualToken
+  const to = walletClient.account?.address
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300) // 5 minutes
 
-  // Calculate required input amount
-  const requiredNativeIn = calculateRequiredAmountIn(
-    tokensOut,
-    k,
-    virtualNative,
-    virtualToken,
-  )
+  // Get required input amount
+  const amountInMax = await publicClient.readContract({
+    address: CONTRACT_ADDRESSES.BONDING_CURVE_ROUTER as `0x${string}`,
+    abi: BondingCurveRouterAbi,
+    functionName: 'getAmountIn',
+    args: [tokenAddress as `0x${string}`, tokensOut, true],
+  })
 
-  // Add buffer for price movement (5%)
-  const maxNativeIn = (requiredNativeIn * 105n) / 100n
-
-  // 1% fee
-  const fee = (maxNativeIn * 10n) / 1000n
-  const totalValue = maxNativeIn + fee
-
-  // 20 minutes deadline
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60)
+  // Add 5% buffer for price movement
+  const amountInMaxWithBuffer = ((amountInMax as bigint) * 105n) / 100n
 
   const txHash = await walletClient.writeContract({
-    address: CONTRACT_ADDRESSES.CORE as `0x${string}`,
-    abi: NadFunAbi.ICore,
+    address: CONTRACT_ADDRESSES.BONDING_CURVE_ROUTER as `0x${string}`,
+    abi: BondingCurveRouterAbi,
     functionName: 'exactOutBuy',
-    args: [tokensOut, maxNativeIn, fee, tokenAddress, address, deadline],
-    value: totalValue,
-    gas: 300000n, // Explicit gas limit
+    args: [
+      {
+        token: tokenAddress as `0x${string}`,
+        amountOut: tokensOut,
+        amountInMax: amountInMaxWithBuffer,
+        to,
+        deadline,
+      },
+    ],
+    value: amountInMaxWithBuffer,
+    gas: 300000n,
     chain: walletClient.chain,
     account: walletClient.account!,
   })
@@ -222,63 +244,69 @@ export async function exactOutBuyFromCore(
  * @param privateKey - Private key of the sender
  * @param tokenAddress - Token address to buy
  * @param amount - Amount of MON to spend
- * @param slippage - Slippage percentage (default 10%)
+ * @param slippage - Slippage percentage (default 0.5%)
  * @returns Transaction hash
  */
 export async function buyFromDex(
   privateKey: string,
   tokenAddress: string,
   amount: string,
-  slippage: number = 10,
+  slippage: number = 0.5,
 ): Promise<string> {
-  // Create wallet client
   const walletClient = createWalletClientFromPrivateKey(privateKey)
   const publicClient = createPublicRpcClient()
 
-  // Check if token is listed
-  const tokenInfo = await fetch(
-    `https://testnet-v3-api.nad.fun/token/${tokenAddress}`,
-  )
-  const tokenData = await tokenInfo.json()
-
-  if (!tokenData.is_listing) {
+  // Check token status
+  const { isListed } = await getTokenStatus(tokenAddress)
+  if (!isListed) {
     throw new Error(
       'Token is not listed on DEX. Use bonding curve functions to buy.',
     )
   }
 
-  // Parse amount to wei
-  const nativeAmountInWei = parseEther(amount)
+  const amountIn = parseEther(amount)
+  const to = walletClient.account?.address
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300) // 5 minutes
 
-  // Calculate deadline (20 minutes from now)
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60)
-
-  // Get expected output amount
-  const path = [
-    CONTRACT_ADDRESSES.WRAPPED_MON as `0x${string}`,
-    tokenAddress as `0x${string}`,
-  ]
-
-  const amounts = await publicClient.readContract({
-    address: CONTRACT_ADDRESSES.UNISWAP_V2_ROUTER as `0x${string}`,
-    abi: NadFunAbi.IUniswapV2Router,
-    functionName: 'getAmountsOut',
-    args: [nativeAmountInWei, path],
-  })
+  // Get expected output amount using static call (returns via revert data)
+  let amountOut: bigint
+  try {
+    await publicClient.readContract({
+      address: CONTRACT_ADDRESSES.DEX_ROUTER as `0x${string}`,
+      abi: DexRouterAbi,
+      functionName: 'getAmountOut',
+      args: [tokenAddress as `0x${string}`, amountIn, true],
+    })
+    // This should not reach here as the function reverts with data
+    throw new Error('Failed to get amount out')
+  } catch (error: any) {
+    // Extract amount from revert data
+    const revertData = error.data || error.cause?.data
+    if (!revertData) {
+      throw new Error('Failed to get amount out from DEX router')
+    }
+    // Decode the revert data to get the amount
+    amountOut = BigInt(revertData.slice(-64)) // Last 32 bytes
+  }
 
   // Calculate minimum amount with slippage
-  const expectedAmount = (amounts as bigint[])[1]
   const slippageFactor = 1000n - BigInt(Math.floor(slippage * 10))
-  const minAmount = (expectedAmount * slippageFactor) / 1000n
+  const amountOutMin = (amountOut * slippageFactor) / 1000n
 
-  // Submit transaction with explicit gas limit
   const txHash = await walletClient.writeContract({
-    address: CONTRACT_ADDRESSES.UNISWAP_V2_ROUTER as `0x${string}`,
-    abi: NadFunAbi.IUniswapV2Router,
-    functionName: 'swapExactNativeForTokens',
-    args: [minAmount, path, walletClient.account?.address, deadline],
-    value: nativeAmountInWei,
-    gas: 300000n, // Explicit gas limit
+    address: CONTRACT_ADDRESSES.DEX_ROUTER as `0x${string}`,
+    abi: DexRouterAbi,
+    functionName: 'buy',
+    args: [
+      {
+        token: tokenAddress as `0x${string}`,
+        amountOutMin,
+        to,
+        deadline,
+      },
+    ],
+    value: amountIn,
+    gas: 300000n,
     chain: walletClient.chain,
     account: walletClient.account!,
   })
@@ -301,38 +329,28 @@ export async function sellToDex(
   amount: string,
   slippage: number = 0.5,
 ): Promise<string> {
-  // Create wallet client
   const walletClient = createWalletClientFromPrivateKey(privateKey)
   const publicClient = createPublicRpcClient()
 
-  // Check if token is listed
-  const tokenInfo = await fetch(
-    `https://testnet-v3-api.nad.fun/token/${tokenAddress}`,
-  )
-  const tokenData = await tokenInfo.json()
-
-  if (!tokenData.is_listing) {
+  // Check token status
+  const { isListed } = await getTokenStatus(tokenAddress)
+  if (!isListed) {
     throw new Error(
       'Token is not listed on DEX. Use bonding curve functions to sell.',
     )
   }
 
-  // Parse amount to wei
-  const tokenAmountInWei = parseEther(amount)
+  const amountIn = parseEther(amount)
+  const to = walletClient.account?.address
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300) // 5 minutes
 
-  // Calculate deadline (20 minutes from now)
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60)
-
-  // First approve tokens to Router
+  // First approve tokens to DEX Router
   const approveTxHash = await walletClient.writeContract({
     address: tokenAddress as `0x${string}`,
-    abi: NadFunAbi.IToken,
+    abi: TokenAbi,
     functionName: 'approve',
-    args: [
-      CONTRACT_ADDRESSES.UNISWAP_V2_ROUTER as `0x${string}`,
-      tokenAmountInWei,
-    ],
-    gas: 300000n, // Explicit gas limit
+    args: [CONTRACT_ADDRESSES.DEX_ROUTER as `0x${string}`, amountIn],
+    gas: 100000n,
     chain: walletClient.chain,
     account: walletClient.account!,
   })
@@ -340,41 +358,106 @@ export async function sellToDex(
   // Wait for approval confirmation
   await publicClient.waitForTransactionReceipt({ hash: approveTxHash })
 
-  // Get expected output amount
-  const path = [
-    tokenAddress as `0x${string}`,
-    CONTRACT_ADDRESSES.WRAPPED_MON as `0x${string}`,
-  ]
-  const amounts = await publicClient.readContract({
-    address: CONTRACT_ADDRESSES.UNISWAP_V2_ROUTER as `0x${string}`,
-    abi: NadFunAbi.IUniswapV2Router,
-    functionName: 'getAmountsOut',
-    args: [tokenAmountInWei, path],
-  })
+  // Get expected output amount using static call (returns via revert data)
+  let amountOut: bigint
+  try {
+    await publicClient.readContract({
+      address: CONTRACT_ADDRESSES.DEX_ROUTER as `0x${string}`,
+      abi: DexRouterAbi,
+      functionName: 'getAmountOut',
+      args: [tokenAddress as `0x${string}`, amountIn, false],
+    })
+    // This should not reach here as the function reverts with data
+    throw new Error('Failed to get amount out')
+  } catch (error: any) {
+    // Extract amount from revert data
+    const revertData = error.data || error.cause?.data
+    if (!revertData) {
+      throw new Error('Failed to get amount out from DEX router')
+    }
+    // Decode the revert data to get the amount
+    amountOut = BigInt(revertData.slice(-64)) // Last 32 bytes
+  }
 
   // Calculate minimum amount with slippage
-  const expectedAmount = (amounts as bigint[])[1]
   const slippageFactor = 1000n - BigInt(Math.floor(slippage * 10))
-  const minAmount = (expectedAmount * slippageFactor) / 1000n
+  const amountOutMin = (amountOut * slippageFactor) / 1000n
 
-  // Submit transaction
   const txHash = await walletClient.writeContract({
-    address: CONTRACT_ADDRESSES.UNISWAP_V2_ROUTER as `0x${string}`,
-    abi: NadFunAbi.IUniswapV2Router,
-    functionName: 'swapExactTokensForNative',
+    address: CONTRACT_ADDRESSES.DEX_ROUTER as `0x${string}`,
+    abi: DexRouterAbi,
+    functionName: 'sell',
     args: [
-      tokenAmountInWei,
-      minAmount,
-      path,
-      walletClient.account?.address,
-      deadline,
+      {
+        token: tokenAddress as `0x${string}`,
+        amountIn,
+        amountOutMin,
+        to,
+        deadline,
+      },
     ],
-    gas: 300000n, // Explicit gas limit
+    gas: 300000n,
     chain: walletClient.chain,
     account: walletClient.account!,
   })
 
   return txHash
+}
+
+/**
+ * Check token status (listed/locked) on bonding curve
+ * @param tokenAddress - Token address to check
+ * @returns Object with isListed and isLocked status
+ */
+export async function getTokenStatus(tokenAddress: string): Promise<{
+  isListed: boolean
+  isLocked: boolean
+}> {
+  const publicClient = createPublicRpcClient()
+
+  const [isListed, isLocked] = await Promise.all([
+    publicClient.readContract({
+      address: CONTRACT_ADDRESSES.BONDING_CURVE as `0x${string}`,
+      abi: BondingCurveAbi,
+      functionName: 'isListed',
+      args: [tokenAddress as `0x${string}`],
+    }),
+    publicClient.readContract({
+      address: CONTRACT_ADDRESSES.BONDING_CURVE as `0x${string}`,
+      abi: BondingCurveAbi,
+      functionName: 'isLocked',
+      args: [tokenAddress as `0x${string}`],
+    }),
+  ])
+
+  return {
+    isListed: isListed as boolean,
+    isLocked: isLocked as boolean,
+  }
+}
+
+/**
+ * Get available tokens for purchase from bonding curve
+ * @param tokenAddress - Token address to check
+ * @returns Object with available tokens and required MON amount
+ */
+export async function getAvailableBuyTokens(tokenAddress: string): Promise<{
+  availableTokens: bigint
+  requiredMonAmount: bigint
+}> {
+  const publicClient = createPublicRpcClient()
+
+  const result = await publicClient.readContract({
+    address: CONTRACT_ADDRESSES.BONDING_CURVE_ROUTER as `0x${string}`,
+    abi: BondingCurveRouterAbi,
+    functionName: 'availableBuyTokens',
+    args: [tokenAddress as `0x${string}`],
+  })
+
+  return {
+    availableTokens: (result as [bigint, bigint])[0],
+    requiredMonAmount: (result as [bigint, bigint])[1],
+  }
 }
 
 /**

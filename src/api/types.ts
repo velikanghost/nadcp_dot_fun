@@ -24,9 +24,11 @@ export interface TokenWithDescription extends Token {
 
 // Market types
 export interface Market {
-  market_address: string
+  market_id: string
   market_type: string
   price: string
+  token_id: string
+  total_supply: string
 }
 
 export interface DetailedMarket extends Market {
@@ -91,15 +93,23 @@ export interface OrderTokenResponse {
 
 // Token Info Response
 export interface TokenInfoResponse {
-  token_address: string
+  token_id: string
   name: string
   symbol: string
   image_uri: string
-  creator: string
-  total_supply: string
-  description?: string
-  is_listing?: boolean
+  description: string
+  twitter: string
+  telegram: string
+  website: string
+  is_listing: boolean
   created_at: number
+  transaction_hash: string
+  account_info: AccountInfo
+  is_king: boolean
+  is_king_created_at: number
+  total_supply: string
+  price: string
+  market_cap: string
 }
 
 // Token Chart Response
@@ -133,7 +143,7 @@ export interface TokenSwapResponse {
 }
 
 // Token Market Response
-export interface TokenMarketResponse extends DetailedMarket {}
+export interface TokenMarketResponse extends Market {}
 
 // Token Holder types
 export interface TokenHolder {

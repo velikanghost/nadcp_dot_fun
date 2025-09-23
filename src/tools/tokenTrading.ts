@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { PublicClient } from 'viem'
 import { parseEther, formatEther } from 'viem/utils'
 import {
-  buyFromCore,
-  exactOutBuyFromCore,
+  buyFromBondingCurve,
+  exactOutBuyFromBondingCurve,
   buyFromDex,
   sellToDex,
   getPrivateKeyFromEnv,
@@ -118,15 +118,27 @@ export const buyTokensFromCurve = async (
       }
     }
 
-    // First, verify that the token is in bonding curve phase
-    const marketInfo = await NadfunApi.getTokenMarket(tokenAddress)
+    // Check token status using contract methods directly
+    const { getTokenStatus } = await import('../api/nadfunRpc')
+    const { isListed, isLocked } = await getTokenStatus(tokenAddress)
 
-    if (marketInfo.market_type !== 'CURVE') {
+    if (isListed) {
       return {
         content: [
           {
             type: 'text' as const,
-            text: `This token (${tokenAddress}) is not in the bonding curve phase. It is already listed on DEX. Use the buyTokensFromDex tool instead.`,
+            text: `This token (${tokenAddress}) is already listed on DEX. Use the buyTokensFromDex tool instead.`,
+          },
+        ],
+      }
+    }
+
+    if (isLocked) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `This token (${tokenAddress}) is locked and cannot be purchased at this time.`,
           },
         ],
       }
@@ -150,47 +162,48 @@ export const buyTokensFromCurve = async (
         walletAddress as string,
         'open',
       )
-      const tokenPosition = positionsBefore.positions.find(
-        (p) =>
-          p.token.token_address.toLowerCase() === tokenAddress.toLowerCase(),
+      const tokenPosition = positionsBefore.tokens.find(
+        (p: any) =>
+          p.token_info.token_id.toLowerCase() === tokenAddress.toLowerCase(),
       )
       if (tokenPosition) {
         tokenAmountBefore = parseFloat(
-          formatEther(BigInt(tokenPosition.position.current_token_amount)),
+          formatEther(BigInt(tokenPosition.balance)),
         )
-        tokenSymbol = tokenPosition.token.symbol
+        tokenSymbol = tokenPosition.token_info.symbol
       }
     } catch (error) {
       console.error('Error fetching positions before purchase:', error)
     }
 
-    // Verify available tokens
-    const reserveToken = BigInt(marketInfo.reserve_token || '0')
-    const soldTokens = BigInt(marketInfo.reserve_native || '0')
-    const availableTokens =
-      reserveToken > soldTokens ? reserveToken - soldTokens : 0n
+    // Check available tokens using contract method directly
+    const { getAvailableBuyTokens } = await import('../api/nadfunRpc')
+    const { availableTokens } = await getAvailableBuyTokens(tokenAddress)
 
-    if (availableTokens <= 0n) {
+    if (availableTokens === 0n) {
       return {
         content: [
           {
             type: 'text' as const,
-            text: `No tokens available for purchase. This token may be fully sold out or already listed on DEX.`,
+            text: `No tokens available for purchase. This token may be fully sold out.`,
           },
         ],
       }
     }
 
-    // Estimate tokens received
-    const virtualNative = BigInt(marketInfo.virtual_native || '0')
-    const virtualToken = BigInt(marketInfo.virtual_token || '0')
+    // Get expected output amount using contract method
+    const { createPublicRpcClient } = await import('../api/nadfunRpc')
+    const publicClient = createPublicRpcClient()
     const amountInWei = parseEther(amount)
 
-    // Use conservative estimate (some tokens might be sold between estimate and transaction)
-    const k = virtualNative * virtualToken
-    const newVirtualNative = virtualNative + amountInWei
-    const newVirtualToken = k / newVirtualNative
-    const estimatedTokensOut = virtualToken - newVirtualToken
+    const amountOut = await publicClient.readContract({
+      address: '0x4F5A3518F082275edf59026f72B66AC2838c0414' as `0x${string}`,
+      abi: (await import('../abi/IBondingCurveRouter.json')).default,
+      functionName: 'getAmountOut',
+      args: [tokenAddress as `0x${string}`, amountInWei, true],
+    })
+
+    const estimatedTokensOut = amountOut as bigint
 
     // Ensure we don't try to buy more than available
     if (estimatedTokensOut > availableTokens) {
@@ -206,7 +219,7 @@ export const buyTokensFromCurve = async (
 
     // Execute transaction with proper error handling
     try {
-      const txHash = await buyFromCore(privateKey, tokenAddress, amount)
+      const txHash = await buyFromBondingCurve(privateKey, tokenAddress, amount)
 
       // Wait for transaction receipt and check status
       const receipt = await client.waitForTransactionReceipt({
@@ -233,16 +246,16 @@ export const buyTokensFromCurve = async (
           walletAddress as string,
           'open',
         )
-        const tokenPosition = positionsAfter.positions.find(
-          (p) =>
-            p.token.token_address.toLowerCase() === tokenAddress.toLowerCase(),
+        const tokenPosition = positionsAfter.tokens.find(
+          (p: any) =>
+            p.token_info.token_id.toLowerCase() === tokenAddress.toLowerCase(),
         )
         if (tokenPosition) {
           const tokenAmountAfter = parseFloat(
-            formatEther(BigInt(tokenPosition.position.current_token_amount)),
+            formatEther(BigInt(tokenPosition.balance)),
           )
           tokenAmountReceived = tokenAmountAfter - tokenAmountBefore
-          tokenSymbol = tokenPosition.token.symbol
+          tokenSymbol = tokenPosition.token_info.symbol
         }
       } catch (error) {
         console.error('Error fetching positions after purchase:', error)
@@ -345,28 +358,36 @@ export const exactOutBuyTokensFromCurve = async (
       }
     }
 
-    // First, verify that the token is in bonding curve phase
-    const marketInfo = await NadfunApi.getTokenMarket(tokenAddress)
+    // Check token status using contract methods directly
+    const { getTokenStatus, getAvailableBuyTokens } = await import(
+      '../api/nadfunRpc'
+    )
+    const { isListed, isLocked } = await getTokenStatus(tokenAddress)
 
-    if (marketInfo.market_type !== 'CURVE') {
+    if (isListed) {
       return {
         content: [
           {
             type: 'text' as const,
-            text: `This token (${tokenAddress}) is not in the bonding curve phase. It is already listed on DEX. Use the buyTokensFromDex tool instead.`,
+            text: `This token (${tokenAddress}) is already listed on DEX. Use the buyTokensFromDex tool instead.`,
           },
         ],
       }
     }
 
-    // Check available tokens - Calculate from reserve_token and reserve_native if they exist
-    // In the bonding curve, available tokens = reserve_token - (remaining tokens sold)
-    const reserveToken = BigInt(marketInfo.reserve_token || '0')
-    // We can estimate the target/sold tokens by subtracting reserve_native from reserve_token
-    // This is an approximation since we don't have direct access to target_token
-    const soldTokens = BigInt(marketInfo.reserve_native || '0')
-    const availableTokens =
-      reserveToken > soldTokens ? reserveToken - soldTokens : 0n
+    if (isLocked) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `This token (${tokenAddress}) is locked and cannot be purchased at this time.`,
+          },
+        ],
+      }
+    }
+
+    // Check available tokens using contract method
+    const { availableTokens } = await getAvailableBuyTokens(tokenAddress)
     const requestedTokens = parseEther(tokensOut)
 
     if (requestedTokens > availableTokens) {
@@ -380,19 +401,23 @@ export const exactOutBuyTokensFromCurve = async (
       }
     }
 
-    // Calculate estimated input amount
-    const virtualNative = BigInt(marketInfo.virtual_native || '0')
-    const virtualToken = BigInt(marketInfo.virtual_token || '0')
-    const k = virtualNative * virtualToken
+    // Get required input amount using contract method
+    const { createPublicRpcClient } = await import('../api/nadfunRpc')
+    const publicClient = createPublicRpcClient()
 
-    // Formula: (k / (virtualToken - tokensOut)) - virtualNative
-    const estimatedAmountIn =
-      k / (virtualToken - requestedTokens) - virtualNative
+    const amountInMax = await publicClient.readContract({
+      address: '0x4F5A3518F082275edf59026f72B66AC2838c0414' as `0x${string}`,
+      abi: (await import('../abi/IBondingCurveRouter.json')).default,
+      functionName: 'getAmountIn',
+      args: [tokenAddress as `0x${string}`, requestedTokens, true],
+    })
+
+    const estimatedAmountIn = amountInMax as bigint
     const estimatedTotalCost =
       estimatedAmountIn + (estimatedAmountIn * 10n) / 1000n // Include 1% fee
 
     // Execute transaction
-    const txHash = await exactOutBuyFromCore(
+    const txHash = await exactOutBuyFromBondingCurve(
       privateKey,
       tokenAddress,
       requestedTokens,
@@ -459,10 +484,11 @@ export const buyTokensFromDex = async (
       }
     }
 
-    // Check if the token is in DEX phase
-    const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
+    // Check token status using contract methods directly
+    const { getTokenStatus } = await import('../api/nadfunRpc')
+    const { isListed } = await getTokenStatus(tokenAddress)
 
-    if (!tokenInfo.is_listing) {
+    if (!isListed) {
       return {
         content: [
           {
@@ -480,23 +506,26 @@ export const buyTokensFromDex = async (
     const walletClient = createWalletClientFromPrivateKey(privateKey)
     const walletAddress = walletClient.account?.address
 
+    // Get token info for symbol
+    const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
+    let tokenSymbol = tokenInfo.symbol || 'tokens'
+
     // Get positions before purchase to compare later
     let tokenAmountBefore = 0
-    let tokenSymbol = tokenInfo.symbol || 'tokens'
     try {
       const positionsBefore = await NadfunApi.getAccountPositions(
         walletAddress as string,
         'open',
       )
-      const tokenPosition = positionsBefore.positions.find(
-        (p) =>
-          p.token.token_address.toLowerCase() === tokenAddress.toLowerCase(),
+      const tokenPosition = positionsBefore.tokens.find(
+        (p: any) =>
+          p.token_info.token_id.toLowerCase() === tokenAddress.toLowerCase(),
       )
       if (tokenPosition) {
         tokenAmountBefore = parseFloat(
-          formatEther(BigInt(tokenPosition.position.current_token_amount)),
+          formatEther(BigInt(tokenPosition.balance)),
         )
-        tokenSymbol = tokenPosition.token.symbol
+        tokenSymbol = tokenPosition.token_info.symbol
       }
     } catch (error) {
       console.error('Error fetching positions before purchase:', error)
@@ -530,16 +559,16 @@ export const buyTokensFromDex = async (
         walletAddress as string,
         'open',
       )
-      const tokenPosition = positionsAfter.positions.find(
-        (p) =>
-          p.token.token_address.toLowerCase() === tokenAddress.toLowerCase(),
+      const tokenPosition = positionsAfter.tokens.find(
+        (p: any) =>
+          p.token_info.token_id.toLowerCase() === tokenAddress.toLowerCase(),
       )
       if (tokenPosition) {
         const tokenAmountAfter = parseFloat(
-          formatEther(BigInt(tokenPosition.position.current_token_amount)),
+          formatEther(BigInt(tokenPosition.balance)),
         )
         tokenAmountReceived = tokenAmountAfter - tokenAmountBefore
-        tokenSymbol = tokenPosition.token.symbol
+        tokenSymbol = tokenPosition.token_info.symbol
       }
     } catch (error) {
       console.error('Error fetching positions after purchase:', error)
@@ -606,10 +635,11 @@ export const sellTokensToDex = async (
       }
     }
 
-    // Check if the token is in DEX phase
-    const tokenInfo = await NadfunApi.getTokenInfo(tokenAddress)
+    // Check token status using contract methods directly
+    const { getTokenStatus } = await import('../api/nadfunRpc')
+    const { isListed } = await getTokenStatus(tokenAddress)
 
-    if (!tokenInfo.is_listing) {
+    if (!isListed) {
       return {
         content: [
           {

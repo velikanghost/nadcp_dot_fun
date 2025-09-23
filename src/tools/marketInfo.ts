@@ -113,16 +113,6 @@ export const getTokenMarketPhaseTool = async (
     let phaseInfo = ''
 
     if (marketType === 'CURVE') {
-      // Calculate available tokens if it's in the bonding curve phase
-      const reserveToken = marketData.reserve_token
-        ? BigInt(marketData.reserve_token)
-        : 0n
-      const targetToken = marketData.reserve_token
-        ? BigInt(marketData.reserve_token) -
-          BigInt(marketData.reserve_native || '0')
-        : 0n
-      const availableTokens = reserveToken - targetToken
-
       phaseInfo = `
 # Token Market Phase: Bonding Curve
 
@@ -133,9 +123,7 @@ This token (${tokenAddress}) is currently in the **Bonding Curve** phase.
 - Token Name: ${tokenInfo.name}
 - Symbol: ${tokenInfo.symbol}
 - Current Price: ${marketData.price} MON
-- Available Tokens: ${availableTokens.toString()}
-- Virtual Native: ${marketData.virtual_native}
-- Virtual Token: ${marketData.virtual_token}
+- Available Tokens: ${tokenInfo.total_supply}
 
 ## What This Means
 - Tokens can be purchased through the bonding curve mechanism

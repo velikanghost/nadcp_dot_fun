@@ -211,35 +211,10 @@ export const getTokenMarket = async (
 
     // Format market information as markdown
     let marketText = `# Market Information for Token (${tokenAddress})\n\n`
-    marketText += `- Market ID: ${response.market_address}\n`
+    marketText += `- Market ID: ${response.market_id}\n`
     marketText += `- Market Type: ${response.market_type}\n`
     marketText += `- Current Price: ${response.price}\n`
-
-    if (response.virtual_native) {
-      marketText += `- Virtual Native: ${response.virtual_native}\n`
-    }
-
-    if (response.virtual_token) {
-      marketText += `- Virtual Token: ${response.virtual_token}\n`
-    }
-
-    if (response.reserve_token) {
-      marketText += `- Reserve Token: ${response.reserve_token}\n`
-    }
-
-    if (response.reserve_native) {
-      marketText += `- Reserve Native: ${response.reserve_native}\n`
-    }
-
-    if (response.latest_trade_at) {
-      marketText += `- Latest Trade: ${new Date(
-        response.latest_trade_at * 1000,
-      ).toLocaleString()}\n`
-    }
-
-    marketText += `- Created: ${new Date(
-      response.created_at * 1000,
-    ).toLocaleString()}\n`
+    marketText += `- Total Supply: ${response.total_supply}\n`
 
     return {
       content: [

@@ -12,7 +12,6 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",
     "axios": "^1.9.0",
-    "contract-abi": "https://github.com/Naddotfun/contract-abi.git#v0.3.0",
     "dotenv": "^16.5.0",
     "mcp-remote": "^0.0.22",
     "next": "15.2.4",
